@@ -1,0 +1,46 @@
+services:
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: gamestore-db
+    restart: always
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD}
+    volumes:
+      - sql_data:/var/opt/mssql
+
+  api:
+    image: ${DOCKERHUB_USERNAME}/gamestore-api:latest
+    container_name: gamestore-api
+    restart: always
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__DefaultConnection: Server=db,1433;Database=GamestoreDb;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;
+      JwtSettings__Issuer: ${JWT_ISSUER}
+      JwtSettings__Audience: ${JWT_AUDIENCE}
+      JwtSettings__Key: ${JWT_KEY}
+      JwtSettings__ExpirationMinutes: ${JWT_EXPIRATION_MINUTES:-120}
+      OrderSettings__CustomerId: ${ORDER_CUSTOMER_ID}
+      OrderSettings__BankInvoiceValidityDays: ${BANK_INVOICE_VALIDITY_DAYS:-3}
+      OrderSettings__PaymentRetryCount: ${PAYMENT_RETRY_COUNT:-3}
+      PaymentGatewaySettings__SimulationEnabled: ${PAYMENT_SIMULATION_ENABLED:-true}
+      PaymentGatewaySettings__IBoxSuccessRate: ${IBOX_SUCCESS_RATE:-0.85}
+      PaymentGatewaySettings__VisaSuccessRate: ${VISA_SUCCESS_RATE:-0.9}
+      DiscountPolling__IntervalMinutes: ${DISCOUNT_POLLING_INTERVAL_MINUTES:-30}
+    depends_on:
+      - db
+    ports:
+      - "8080:8080"
+
+  web:
+    image: ${DOCKERHUB_USERNAME}/gamestore-web:latest
+    container_name: gamestore-web
+    restart: always
+    depends_on:
+      - api
+    ports:
+      - "3000:80"
+
+volumes:
+  sql_data:

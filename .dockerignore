@@ -1,0 +1,12 @@
+**/bin
+**/obj
+**/TestResults
+**/node_modules
+**/.vs
+**/.idea
+**/.git
+**/.github
+**/*.user
+**/*.suo
+**/*.cache
+**/.DS_Store
