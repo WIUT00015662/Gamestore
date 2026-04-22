@@ -17,8 +17,11 @@ using QuestPDF.Infrastructure;
 DotEnvLoader.Load(
     Path.Combine(Directory.GetCurrentDirectory(), ".env"),
     Path.Combine(Directory.GetCurrentDirectory(), "..", ".env"),
+    Path.Combine(Directory.GetCurrentDirectory(), "..", "..", ".env"),
     Path.Combine(AppContext.BaseDirectory, ".env"),
-    Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".env"));
+    Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".env"),
+    Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", ".env"));
+
 
 var builder = WebApplication.CreateBuilder(args);
 
