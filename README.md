@@ -128,7 +128,7 @@ dotnet ef database update --project Gamestore.DAL --startup-project Gamestore.Ap
 ```bash
 cd Gamestore/Gamestore.Api
 dotnet run
-# API will be available at http://localhost:5000
+# API will be available at https://localhost:7091 (or http://localhost:5091)
 ```
 
 ### 5. Run Frontend
