@@ -1,4 +1,5 @@
 using Gamestore.Api.Auth;
+using Gamestore.Api.Services;
 using Gamestore.BLL.DTOs.Comment;
 using Gamestore.BLL.DTOs.Game;
 using Gamestore.BLL.Services;
@@ -11,14 +12,15 @@ namespace Gamestore.Api.Controllers;
 /// Games controller.
 /// </summary>
 [ApiController]
-[Route("[controller]")]
+[Route("games")]
 public class GamesController(
     IGameService gameService,
     IGenreService genreService,
     IPlatformService platformService,
     IPublisherService publisherService,
     IOrderService orderService,
-    ICommentService commentService) : ControllerBase
+    ICommentService commentService,
+    ICurrentUserService currentUserService) : ControllerBase
 {
     private readonly IGameService _gameService = gameService;
     private readonly IGenreService _genreService = genreService;
@@ -26,6 +28,7 @@ public class GamesController(
     private readonly IPublisherService _publisherService = publisherService;
     private readonly IOrderService _orderService = orderService;
     private readonly ICommentService _commentService = commentService;
+    private readonly ICurrentUserService _currentUserService = currentUserService;
 
     [Authorize(Policy = Permissions.AddGame)]
     [HttpPost]
@@ -116,7 +119,8 @@ public class GamesController(
     [HttpPost("{key}/buy")]
     public async Task<IActionResult> BuyGame(string key)
     {
-        await _orderService.AddGameToCartAsync(key);
+        var userId = _currentUserService.GetUserId();
+        await _orderService.AddGameToCartAsync(key, userId);
         return NoContent();
     }
 
@@ -134,14 +138,6 @@ public class GamesController(
     {
         var comments = await _commentService.GetCommentsByGameKeyAsync(key);
         return Ok(comments);
-    }
-
-    [Authorize(Policy = Permissions.ManageComments)]
-    [HttpDelete("{key}/comments/{id:guid}")]
-    public async Task<IActionResult> DeleteComment(string key, Guid id)
-    {
-        await _commentService.DeleteCommentAsync(key, id);
-        return NoContent();
     }
 
     [Authorize(Policy = Permissions.UpdateGame)]
@@ -187,5 +183,24 @@ public class GamesController(
     {
         var publisher = await _publisherService.GetPublisherByGameKeyAsync(key);
         return Ok(publisher);
+    }
+
+    [Authorize(Policy = Permissions.CommentGame)]
+    [HttpPut("{key}/comments/{id:guid}")]
+    public async Task<IActionResult> UpdateComment(string key, Guid id, [FromBody] UpdateCommentRequest request)
+    {
+        var actorName = User.Identity?.Name ?? throw new ArgumentException("Authenticated user name is required.");
+        await _commentService.UpdateCommentAsync(key, id, request, actorName);
+        return NoContent();
+    }
+
+    [Authorize(Policy = Permissions.CommentGame)]
+    [HttpDelete("{key}/comments/{id:guid}")]
+    public async Task<IActionResult> DeleteComment(string key, Guid id)
+    {
+        var actorName = User.Identity?.Name ?? throw new ArgumentException("Authenticated user name is required.");
+        var canManageComments = User.HasClaim("permission", Permissions.ManageComments);
+        await _commentService.DeleteCommentAsync(key, id, actorName, canManageComments);
+        return NoContent();
     }
 }

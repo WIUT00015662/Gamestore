@@ -8,9 +8,13 @@ public interface ICommentService
 
     Task<IEnumerable<CommentResponse>> GetCommentsByGameKeyAsync(string gameKey);
 
-    Task DeleteCommentAsync(string gameKey, Guid commentId);
+    Task UpdateCommentAsync(string gameKey, Guid commentId, UpdateCommentRequest request, string actorName);
+
+    Task DeleteCommentAsync(string gameKey, Guid commentId, string actorName, bool canManageComments);
 
     IEnumerable<string> GetBanDurations();
 
     Task BanUserAsync(BanUserRequest request);
+
+    Task<IEnumerable<string>> SearchUserNamesAsync(string query, int take);
 }

@@ -7,6 +7,10 @@ public interface IAuthManagementService
 {
     Task<TokenResponse> LoginAsync(LoginRequest request);
 
+    Task<TokenResponse> RegisterAsync(RegisterRequest request);
+
+    Task<TokenResponse> RefreshTokenAsync(RefreshTokenRequest request);
+
     Task<bool> CheckAccessAsync(ClaimsPrincipal principal, AccessRequest request);
 
     Task<IEnumerable<BasicUserResponse>> GetUsersAsync();

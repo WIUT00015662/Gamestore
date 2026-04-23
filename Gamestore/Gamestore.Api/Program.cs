@@ -50,6 +50,8 @@ builder.Services.AddScoped<IDiscountSimulationService, DiscountSimulationService
 builder.Services.AddScoped<IDiscountNotificationService, LoggingDiscountNotificationService>();
 
 builder.Services.AddScoped<IAuthManagementService, AuthManagementService>();
+builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
+builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton<IAuthorizationHandler, PermissionAuthorizationHandler>();
 
 var jwtSettings = builder.Configuration.GetSection("JwtSettings").Get<JwtSettings>() ?? new JwtSettings();

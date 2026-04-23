@@ -32,7 +32,7 @@ internal sealed class GameConfiguration : IEntityTypeConfiguration<Game>
         builder.HasOne(g => g.Publisher)
             .WithMany(p => p.Games)
             .HasForeignKey(g => g.PublisherId)
-            .OnDelete(DeleteBehavior.Restrict);
+            .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasMany(g => g.Genres)
             .WithMany()

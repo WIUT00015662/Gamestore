@@ -94,6 +94,7 @@ public class CommentService(IUnitOfWork unitOfWork) : ICommentService
                         Id = comment.Id,
                         Name = comment.Name,
                         Body = comment.Body,
+                        IsDeleted = comment.IsDeleted,
                         ChildComments = BuildTree(comment.Id),
                     }),
             ];
@@ -102,7 +103,7 @@ public class CommentService(IUnitOfWork unitOfWork) : ICommentService
         return BuildTree(null);
     }
 
-    public async Task DeleteCommentAsync(string gameKey, Guid commentId)
+    public async Task UpdateCommentAsync(string gameKey, Guid commentId, UpdateCommentRequest request, string actorName)
     {
         var game = await _unitOfWork.Games.GetByKeyIncludingDeletedAsync(gameKey)
             ?? throw new EntityNotFoundException(nameof(Game), gameKey);
@@ -115,17 +116,53 @@ public class CommentService(IUnitOfWork unitOfWork) : ICommentService
             throw new ArgumentException("Comment does not belong to the specified game.");
         }
 
+        if (!comment.Name.Equals(actorName, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException("Only comment owner can edit comment.");
+        }
+
+        if (comment.IsDeleted)
+        {
+            throw new ArgumentException("Deleted comments cannot be edited.");
+        }
+
+        var oldBody = comment.Body;
+        comment.Body = request.Comment.Body;
+        _unitOfWork.Comments.Update(comment);
+
+        await RefreshQuotedCascadeAsync(comment.Id, oldBody, comment.Body);
+        await _unitOfWork.SaveChangesAsync();
+    }
+
+    public async Task DeleteCommentAsync(string gameKey, Guid commentId, string actorName, bool canManageComments)
+    {
+        var game = await _unitOfWork.Games.GetByKeyIncludingDeletedAsync(gameKey)
+            ?? throw new EntityNotFoundException(nameof(Game), gameKey);
+
+        var comment = await _unitOfWork.Comments.GetByIdWithDetailsAsync(commentId)
+            ?? throw new EntityNotFoundException(nameof(Comment), commentId);
+
+        if (comment.GameId != game.Id)
+        {
+            throw new ArgumentException("Comment does not belong to the specified game.");
+        }
+
+        if (!canManageComments && !comment.Name.Equals(actorName, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException("Only comment owner or moderator can delete comment.");
+        }
+
+        if (comment.IsDeleted)
+        {
+            return;
+        }
+
+        var oldBody = comment.Body;
         comment.Body = DeletedMessage;
         comment.IsDeleted = true;
         _unitOfWork.Comments.Update(comment);
 
-        var quotedComments = await _unitOfWork.Comments.GetQuotedByCommentIdAsync(commentId);
-        foreach (var quotedComment in quotedComments)
-        {
-            quotedComment.Body = ReplaceQuotedPrefix(quotedComment.Body);
-            _unitOfWork.Comments.Update(quotedComment);
-        }
-
+        await RefreshQuotedCascadeAsync(comment.Id, oldBody, comment.Body);
         await _unitOfWork.SaveChangesAsync();
     }
 
@@ -161,6 +198,20 @@ public class CommentService(IUnitOfWork unitOfWork) : ICommentService
         await _unitOfWork.SaveChangesAsync();
     }
 
+    public async Task<IEnumerable<string>> SearchUserNamesAsync(string query, int take)
+    {
+        var users = await _unitOfWork.Users.GetAllAsync();
+        var normalized = query.Trim();
+        var limit = Math.Clamp(take, 1, 50);
+
+        return users
+            .Select(u => u.Name)
+            .Where(name => string.IsNullOrWhiteSpace(normalized) || name.Contains(normalized, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(name => name)
+            .Take(limit)
+            .ToList();
+    }
+
     private async Task<bool> IsUserBannedAsync(string name)
     {
         var ban = await _unitOfWork.CommentBans.GetByNameAsync(name);
@@ -179,12 +230,36 @@ public class CommentService(IUnitOfWork unitOfWork) : ICommentService
         };
     }
 
-    private static string ReplaceQuotedPrefix(string body)
+    private async Task RefreshQuotedCascadeAsync(Guid sourceCommentId, string oldPrefix, string newPrefix)
     {
+        var quotedComments = (await _unitOfWork.Comments.GetQuotedByCommentIdAsync(sourceCommentId)).ToList();
+        foreach (var quotedComment in quotedComments)
+        {
+            var oldQuotedBody = quotedComment.Body;
+            var suffix = ExtractSuffix(quotedComment.Body, oldPrefix);
+            quotedComment.Body = string.IsNullOrWhiteSpace(suffix)
+                ? newPrefix
+                : $"{newPrefix}, {suffix}";
+            _unitOfWork.Comments.Update(quotedComment);
+
+            await RefreshQuotedCascadeAsync(quotedComment.Id, oldQuotedBody, quotedComment.Body);
+        }
+    }
+
+    private static string ExtractSuffix(string body, string expectedPrefix)
+    {
+        var prefixWithSeparator = $"{expectedPrefix}, ";
+        if (body.StartsWith(prefixWithSeparator, StringComparison.Ordinal))
+        {
+            return body[prefixWithSeparator.Length..].Trim();
+        }
+
+        if (body.Equals(expectedPrefix, StringComparison.Ordinal))
+        {
+            return string.Empty;
+        }
+
         var commaIndex = body.IndexOf(',');
-        var suffix = commaIndex < 0 ? string.Empty : body[(commaIndex + 1)..].TrimStart();
-        return string.IsNullOrWhiteSpace(suffix)
-            ? DeletedMessage
-            : $"{DeletedMessage}, {suffix}";
+        return commaIndex < 0 ? string.Empty : body[(commaIndex + 1)..].Trim();
     }
 }

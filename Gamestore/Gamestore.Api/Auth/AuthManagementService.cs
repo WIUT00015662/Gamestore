@@ -44,6 +44,63 @@ public class AuthManagementService(IUnitOfWork unitOfWork, JwtSettings jwtSettin
         return new TokenResponse { Token = CreateToken(user, roles.Select(r => r.Name), permissions) };
     }
 
+    public async Task<TokenResponse> RegisterAsync(RegisterRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.UserName) || string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Password))
+        {
+            throw new ArgumentException("Username, email and password are required.");
+        }
+
+        if (await _unitOfWork.Users.GetByNameAsync(request.UserName.Trim()) is not null)
+        {
+            throw new EntityAlreadyExistsException(nameof(User), nameof(User.Name), request.UserName.Trim());
+        }
+
+        var userRole = await _unitOfWork.Roles.GetByNameAsync(DefaultRoles.User)
+            ?? throw new EntityNotFoundException(nameof(Role), DefaultRoles.User);
+
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Name = request.UserName.Trim(),
+            PasswordHash = HashPassword(request.Password),
+            UserRoles =
+            [
+                new UserRole { RoleId = userRole.Id },
+            ],
+        };
+
+        await _unitOfWork.Users.AddAsync(user);
+        await _unitOfWork.SaveChangesAsync();
+
+        var permissions = userRole.Permissions.Select(p => p.Permission).Distinct(StringComparer.OrdinalIgnoreCase);
+        return new TokenResponse { Token = CreateToken(user, [userRole.Name], permissions) };
+    }
+
+    public async Task<TokenResponse> RefreshTokenAsync(RefreshTokenRequest request)
+    {
+        var principal = ValidateExpiredToken(request.Token);
+        var userName = principal.Identity?.Name
+            ?? principal.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Name)?.Value
+            ?? throw new ArgumentException("Invalid token.");
+
+        var user = await _unitOfWork.Users.GetByNameAsync(userName)
+            ?? throw new ArgumentException("User no longer exists.");
+
+        var roles = user.UserRoles
+            .Where(ur => ur.Role is not null)
+            .Select(ur => ur.Role)
+            .OfType<Role>()
+            .ToList();
+
+        var permissions = roles
+            .SelectMany(r => r.Permissions.Select(p => p.Permission))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        return new TokenResponse { Token = CreateToken(user, roles.Select(r => r.Name), permissions) };
+    }
+
     public async Task<bool> CheckAccessAsync(ClaimsPrincipal principal, AccessRequest request)
     {
         var permission = request.TargetPage.Trim().ToLowerInvariant() switch
@@ -365,5 +422,30 @@ public class AuthManagementService(IUnitOfWork unitOfWork, JwtSettings jwtSettin
             signingCredentials: creds);
 
         return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+    private ClaimsPrincipal ValidateExpiredToken(string token)
+    {
+        var tokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateAudience = true,
+            ValidateIssuer = true,
+            ValidateIssuerSigningKey = true,
+            ValidateLifetime = false,
+            ValidIssuer = _jwtSettings.Issuer,
+            ValidAudience = _jwtSettings.Audience,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.Key)),
+        };
+
+        var tokenHandler = new JwtSecurityTokenHandler();
+        var principal = tokenHandler.ValidateToken(token, tokenValidationParameters, out var securityToken);
+
+        if (securityToken is not JwtSecurityToken jwtToken ||
+            !jwtToken.Header.Alg.Equals(SecurityAlgorithms.HmacSha256, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new SecurityTokenException("Invalid token.");
+        }
+
+        return principal;
     }
 }

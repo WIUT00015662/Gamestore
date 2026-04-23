@@ -8,5 +8,7 @@ public class CommentResponse
 
     public required string Body { get; set; }
 
+    public bool IsDeleted { get; set; }
+
     public List<CommentResponse> ChildComments { get; set; } = [];
 }

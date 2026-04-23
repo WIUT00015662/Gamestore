@@ -21,6 +21,14 @@ public class CommentsController(ICommentService commentService) : ControllerBase
     }
 
     [Authorize(Policy = Permissions.BanUsers)]
+    [HttpGet("users/search")]
+    public async Task<IActionResult> SearchUsers([FromQuery] string query = "", [FromQuery] int take = 20)
+    {
+        var users = await _commentService.SearchUserNamesAsync(query, take);
+        return Ok(users);
+    }
+
+    [Authorize(Policy = Permissions.BanUsers)]
     [HttpPost("ban")]
     public async Task<IActionResult> BanUser([FromBody] BanUserRequest request)
     {
