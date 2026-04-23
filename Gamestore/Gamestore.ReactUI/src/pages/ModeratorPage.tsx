@@ -3,6 +3,8 @@ import { api } from '../api/client';
 
 export function ModeratorPage() {
   const [durations, setDurations] = useState<string[]>([]);
+  const [query, setQuery] = useState('');
+  const [matches, setMatches] = useState<string[]>([]);
   const [user, setUser] = useState('');
   const [duration, setDuration] = useState('permanent');
   const [message, setMessage] = useState('');
@@ -24,6 +26,23 @@ export function ModeratorPage() {
     void load();
   }, []);
 
+  useEffect(() => {
+    const id = setTimeout(() => {
+      const search = async () => {
+        try {
+          const response = await api.searchUsers(query, 20);
+          setMatches(response);
+        } catch {
+          setMatches([]);
+        }
+      };
+
+      void search();
+    }, 250);
+
+    return () => clearTimeout(id);
+  }, [query]);
+
   const ban = async () => {
     try {
       await api.banUser(user, duration);
@@ -42,7 +61,24 @@ export function ModeratorPage() {
       <div className="form-wrap">
         <div className="form">
           <label>
-            User name
+            Search user name
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Type to search users"
+            />
+          </label>
+          {matches.length > 0 ? (
+            <ul className="list compact search-results">
+              {matches.map((match) => (
+                <li key={match}>
+                  <button type="button" className="btn-small" onClick={() => setUser(match)}>{match}</button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          <label>
+            Selected user
             <input value={user} onChange={(e) => setUser(e.target.value)} placeholder="User name" />
           </label>
           <label>

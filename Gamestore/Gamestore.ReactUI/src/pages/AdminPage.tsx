@@ -263,10 +263,10 @@ export function AdminPage() {
           <div className="form">
             <label>
               New role name
-              <input value={newRoleName} onChange={(e: ChangeEvent<HTMLInputElement>) => setNewRoleName(e.target.value)} />
+              <input value={newRoleName} onChange={(e) => setNewRoleName(e.target.value)} />
             </label>
             <div className="check-grid">
-              {permissions.map((permission: string) => (
+              {permissions.map((permission) => (
                 <label key={permission}>
                   <input
                     type="checkbox"
@@ -285,10 +285,10 @@ export function AdminPage() {
               <h4>Edit role</h4>
               <label>
                 Name
-                <input value={editRoleName} onChange={(e: ChangeEvent<HTMLInputElement>) => setEditRoleName(e.target.value)} />
+                <input value={editRoleName} onChange={(e) => setEditRoleName(e.target.value)} />
               </label>
               <div className="check-grid">
-                {permissions.map((permission: string) => (
+                {permissions.map((permission) => (
                   <label key={permission}>
                     <input
                       type="checkbox"

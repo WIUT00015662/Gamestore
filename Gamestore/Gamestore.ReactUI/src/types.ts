@@ -1,3 +1,11 @@
+export enum OrderStatus {
+  Open = 0,
+  Checkout = 1,
+  Paid = 2,
+  Cancelled = 3,
+  Shipped = 4,
+}
+
 export type LoginRequest = {
   model: {
     login: string;
@@ -47,6 +55,7 @@ export type Comment = {
   id: string;
   name: string;
   body: string;
+  isDeleted?: boolean;
   childComments: Comment[];
 };
 
@@ -99,6 +108,7 @@ export type Order = {
   id: string;
   customerId: string;
   date?: string;
+  status: OrderStatus;
 };
 
 export type IBoxPaymentResponse = {
@@ -113,4 +123,24 @@ export type DiscountPollingResult = {
   polledAt: string;
   totalDiscountedGames: number;
   featuredGamesCount: number;
+};
+
+export type RegisterRequest = {
+  userName: string;
+  email: string;
+  password: string;
+};
+
+export type RefreshTokenRequest = {
+  token: string;
+};
+
+export type GameFilters = {
+  name?: string;
+  page?: number;
+  pageCount?: string;
+  sort?: string;
+  datePublishing?: string;
+  minPrice?: number;
+  maxPrice?: number;
 };

@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
+import { hasPermission } from '../auth';
 
 export function ManagerPage() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const canManageEntities = hasPermission('ManageEntities');
+  const canManageOrders = hasPermission('ManageOrders');
 
   const runPolling = async () => {
     try {
@@ -22,20 +25,26 @@ export function ManagerPage() {
       <p className="muted">Manage catalog and operational workflows.</p>
 
       <div className="toolbar">
-        <button type="button" className="btn" onClick={() => void runPolling()}>
-          Run discount polling
-        </button>
+        {canManageEntities ? (
+          <>
+            <button type="button" className="btn" onClick={() => void runPolling()}>
+              Run discount polling
+            </button>
+            <Link to="/manager/games" className="btn-link">
+              Manage games
+            </Link>
+            <Link to="/manager/entities" className="btn-link">
+              Manage entities
+            </Link>
+          </>
+        ) : null}
+        {canManageOrders ? (
+          <Link to="/manager/orders" className="btn-link">
+            Manage orders
+          </Link>
+        ) : null}
         <Link to="/games" className="btn-link">
           Open games catalog
-        </Link>
-        <Link to="/manager/games" className="btn-link">
-          Manage games
-        </Link>
-        <Link to="/manager/entities" className="btn-link">
-          Manage entities
-        </Link>
-        <Link to="/manager/orders" className="btn-link">
-          Manage orders
         </Link>
       </div>
 

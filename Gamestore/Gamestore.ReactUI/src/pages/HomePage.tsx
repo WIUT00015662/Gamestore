@@ -1,27 +1,75 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useState, type FormEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
-import { getPrimaryRole, hasPermission } from '../auth';
+import { hasPermission } from '../auth';
 import type { Deal, Game } from '../types';
 
 export function HomePage() {
+  const navigate = useNavigate();
   const [deals, setDeals] = useState<Deal[]>([]);
   const [games, setGames] = useState<Game[]>([]);
   const [error, setError] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
+  const [sort, setSort] = useState('');
+  const [datePublishing, setDatePublishing] = useState('');
+  const [pageCount, setPageCount] = useState('10');
+  const [minPrice, setMinPrice] = useState('');
+  const [maxPrice, setMaxPrice] = useState('');
+
+  const [sortingOptions, setSortingOptions] = useState<string[]>([]);
+  const [publishDateOptions, setPublishDateOptions] = useState<string[]>([]);
+  const [paginationOptions, setPaginationOptions] = useState<string[]>([]);
+
+  const loadGames = async (nextPage: number, nextSearch = search) => {
+    try {
+      const response = await api.getGamesFiltered({
+        name: nextSearch,
+        page: nextPage,
+        pageCount,
+        sort: sort || undefined,
+        datePublishing: datePublishing || undefined,
+        minPrice: minPrice ? Number(minPrice) : undefined,
+        maxPrice: maxPrice ? Number(maxPrice) : undefined,
+      });
+      setGames(response.games);
+      setTotalPages(response.totalPages || 1);
+      setPage(response.currentPage || nextPage);
+      setError('');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load games');
+    }
+  };
 
   useEffect(() => {
     const load = async () => {
       try {
-        const [featuredDeals, gamesResponse] = await Promise.all([api.getFeaturedDeals(), api.getGames('', 1)]);
+        const [featuredDeals, sorting, publishDates, pagination] = await Promise.all([
+          api.getFeaturedDeals(),
+          api.getSortingOptions(),
+          api.getPublishDateOptions(),
+          api.getPaginationOptions(),
+        ]);
         setDeals(featuredDeals);
-        setGames(gamesResponse.games);
+        setSortingOptions(sorting);
+        setPublishDateOptions(publishDates);
+        setPaginationOptions(pagination);
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Failed to load home data');
       }
+
+      await loadGames(1, '');
     };
 
     void load();
   }, []);
+
+  useEffect(() => {
+    void loadGames(1, search);
+  }, [sort, datePublishing, pageCount]);
 
   const canPoll = hasPermission('ManageEntities');
 
@@ -35,34 +83,15 @@ export function HomePage() {
     }
   };
 
-  const role = getPrimaryRole();
-  const capabilities = useMemo(
-    () => [
-      { title: 'Browse games', enabled: true },
-      { title: 'Buy games', enabled: hasPermission('BuyGame') },
-      { title: 'Comment', enabled: hasPermission('CommentGame') },
-      { title: 'Moderate comments', enabled: hasPermission('ManageComments') },
-      { title: 'Manage entities', enabled: hasPermission('ManageEntities') },
-      { title: 'Manage users', enabled: hasPermission('ManageUsers') },
-      { title: 'Manage roles', enabled: hasPermission('ManageRoles') },
-    ],
-    [],
-  );
+  const runSearch = async (e: FormEvent) => {
+    e.preventDefault();
+    const trimmed = searchInput.trim();
+    setSearch(trimmed);
+    await loadGames(1, trimmed);
+  };
 
   return (
     <div>
-      <section className="section">
-        <h2>Current access</h2>
-        <p className="muted">Role: {role}</p>
-        <ul className="capabilities">
-          {capabilities.map((item) => (
-            <li key={item.title} className={item.enabled ? 'enabled' : 'disabled'}>
-              {item.title}
-            </li>
-          ))}
-        </ul>
-      </section>
-
       <section className="section">
         <div className="section-header">
           <h2>Top discounted deals</h2>
@@ -75,34 +104,95 @@ export function HomePage() {
         {deals.length === 0 ? <p className="muted">No featured deals yet.</p> : null}
         <div className="card-grid">
           {deals.map((deal) => (
-            <article className="card" key={`${deal.gameId}-${deal.vendor}`}>
+            <article className="card card-clickable" key={`${deal.gameId}-${deal.vendor}`} onClick={() => window.open(deal.purchaseUrl, '_blank', 'noreferrer')}>
+              <p className="muted">Game</p>
               <h3>{deal.gameName}</h3>
-              <p className="muted">{deal.vendor}</p>
+              <p className="muted">Publisher / Vendor</p>
+              <p>{deal.vendor}</p>
+              <p className="muted">Discount</p>
               <p>
                 <strong>{deal.discountPercent}% off</strong>
               </p>
+              <p className="muted">Price</p>
               <p>
                 ${deal.discountedPrice.toFixed(2)} <span className="muted">(was ${deal.originalPrice.toFixed(2)})</span>
               </p>
-              <a href={deal.purchaseUrl} target="_blank" rel="noreferrer">
-                Open store
-              </a>
             </article>
           ))}
         </div>
       </section>
 
       <section className="section">
-        <h2>Games</h2>
+        <h2>Games catalog</h2>
+        <form className="toolbar" onSubmit={(e) => void runSearch(e)}>
+          <input
+            placeholder="Search games"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+          />
+          <select value={sort} onChange={(e) => setSort(e.target.value)}>
+            <option value="">Sort by</option>
+            {sortingOptions.map((option) => (
+              <option key={option} value={option}>{option}</option>
+            ))}
+          </select>
+          <select value={datePublishing} onChange={(e) => setDatePublishing(e.target.value)}>
+            <option value="">Publish date</option>
+            {publishDateOptions.map((option) => (
+              <option key={option} value={option}>{option}</option>
+            ))}
+          </select>
+          <select value={pageCount} onChange={(e) => setPageCount(e.target.value)}>
+            {paginationOptions.map((option) => (
+              <option key={option} value={option}>{option} / page</option>
+            ))}
+          </select>
+          <input type="number" min="0" step="0.01" placeholder="Min price" value={minPrice} onChange={(e) => setMinPrice(e.target.value)} />
+          <input type="number" min="0" step="0.01" placeholder="Max price" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} />
+          <button className="btn" type="submit">Search</button>
+          <button
+            className="btn"
+            type="button"
+            onClick={() => {
+              setSearchInput('');
+              setSearch('');
+              setSort('');
+              setDatePublishing('');
+              setMinPrice('');
+              setMaxPrice('');
+              setPage(1);
+              void loadGames(1, '');
+            }}
+          >
+            Reset
+          </button>
+        </form>
+
+        {games.length === 0 ? <p className="muted">No games found for current criteria.</p> : null}
+
         <div className="card-grid">
           {games.map((game) => (
-            <article className="card" key={game.id}>
+            <article className="card card-clickable" key={game.id} onClick={() => navigate(`/games/${game.key}`)}>
+              <p className="muted">Game</p>
               <h3>{game.name}</h3>
-              <p className="muted">{game.key}</p>
+              <p className="muted">Key</p>
+              <p>{game.key}</p>
+              <p className="muted">Price</p>
               <p>${game.price.toFixed(2)}</p>
-              <Link to={`/games/${game.key}`}>Details</Link>
+              <p className="muted">Stock</p>
+              <p>{game.unitInStock}</p>
             </article>
           ))}
+        </div>
+
+        <div className="toolbar">
+          <button className="btn" type="button" disabled={page <= 1} onClick={() => void loadGames(page - 1)}>
+            Previous
+          </button>
+          <span className="muted">Page {page} of {Math.max(totalPages, 1)}</span>
+          <button className="btn" type="button" disabled={page >= totalPages} onClick={() => void loadGames(page + 1)}>
+            Next
+          </button>
         </div>
       </section>
 

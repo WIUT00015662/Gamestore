@@ -1,6 +1,7 @@
 import { useEffect, useState, type ChangeEvent } from 'react';
 import { api } from '../api/client';
 import type { CartItem, Order } from '../types';
+import { OrderStatus } from '../types';
 
 export function OrdersManagementPage() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -91,9 +92,12 @@ export function OrdersManagementPage() {
             {orders.map((order: Order) => (
               <li key={order.id}>
                 <span>{order.id}</span>
+                <span>{order.status}</span>
                 <div className="row-actions">
                   <button type="button" className="btn-small" onClick={() => void loadDetails(order.id)}>Details</button>
-                  <button type="button" className="btn-small" onClick={() => void ship(order.id)}>Ship</button>
+                  {order.status === OrderStatus.Paid ? (
+                    <button type="button" className="btn-small" onClick={() => void ship(order.id)}>Ship</button>
+                  ) : null}
                 </div>
               </li>
             ))}
