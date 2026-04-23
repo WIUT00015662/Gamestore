@@ -131,7 +131,7 @@ public class CommentServiceTests
         _commentRepoMock.Setup(x => x.GetByIdWithDetailsAsync(commentId)).ReturnsAsync(comment);
         _commentRepoMock.Setup(x => x.GetQuotedByCommentIdAsync(commentId)).ReturnsAsync([quotingComment]);
 
-        await _commentService.DeleteCommentAsync("game", commentId);
+        await _commentService.DeleteCommentAsync("game", commentId, "A", false);
 
         Assert.Equal("A comment/quote was deleted", comment.Body);
         Assert.Equal("A comment/quote was deleted, my quote text", quotingComment.Body);

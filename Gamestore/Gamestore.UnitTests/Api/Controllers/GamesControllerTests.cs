@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Gamestore.Api.Auth;
 using Gamestore.Api.Controllers;
+using Gamestore.Api.Services;
 using Gamestore.BLL.DTOs.Comment;
 using Gamestore.BLL.DTOs.Game;
 using Gamestore.BLL.DTOs.Genre;
@@ -21,7 +22,9 @@ public class GamesControllerTests
     private readonly Mock<IPublisherService> _publisherServiceMock;
     private readonly Mock<IOrderService> _orderServiceMock;
     private readonly Mock<ICommentService> _commentServiceMock;
+    private readonly Mock<ICurrentUserService> _currentUserServiceMock;
     private readonly GamesController _controller;
+    private readonly Guid _testUserId = Guid.NewGuid();
 
     public GamesControllerTests()
     {
@@ -31,6 +34,8 @@ public class GamesControllerTests
         _publisherServiceMock = new Mock<IPublisherService>();
         _orderServiceMock = new Mock<IOrderService>();
         _commentServiceMock = new Mock<ICommentService>();
+        _currentUserServiceMock = new Mock<ICurrentUserService>();
+        _currentUserServiceMock.Setup(s => s.GetUserId()).Returns(_testUserId);
 
         _controller = new GamesController(
             _gameServiceMock.Object,
@@ -38,7 +43,8 @@ public class GamesControllerTests
             _platformServiceMock.Object,
             _publisherServiceMock.Object,
             _orderServiceMock.Object,
-            _commentServiceMock.Object)
+            _commentServiceMock.Object,
+            _currentUserServiceMock.Object)
         {
             ControllerContext = new ControllerContext
             {
@@ -195,12 +201,12 @@ public class GamesControllerTests
     [Fact]
     public async Task BuyGameReturnsNoContent()
     {
-        _orderServiceMock.Setup(s => s.AddGameToCartAsync("test")).Returns(Task.CompletedTask);
+        _orderServiceMock.Setup(s => s.AddGameToCartAsync("test", _testUserId)).Returns(Task.CompletedTask);
 
         var result = await _controller.BuyGame("test");
 
         Assert.IsType<NoContentResult>(result);
-        _orderServiceMock.Verify(s => s.AddGameToCartAsync("test"), Times.Once);
+        _orderServiceMock.Verify(s => s.AddGameToCartAsync("test", _testUserId), Times.Once);
     }
 
     [Fact]
@@ -254,12 +260,21 @@ public class GamesControllerTests
     public async Task DeleteCommentReturnsNoContent()
     {
         var commentId = Guid.NewGuid();
-        _commentServiceMock.Setup(x => x.DeleteCommentAsync("test", commentId)).Returns(Task.CompletedTask);
+        _commentServiceMock.Setup(x => x.DeleteCommentAsync("test", commentId, It.IsAny<string>(), It.IsAny<bool>())).Returns(Task.CompletedTask);
+
+        var identity = new ClaimsIdentity([new Claim(ClaimTypes.Name, "AuthorizedUser")], "TestAuth");
+        _controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(identity),
+            },
+        };
 
         var result = await _controller.DeleteComment("test", commentId);
 
         Assert.IsType<NoContentResult>(result);
-        _commentServiceMock.Verify(x => x.DeleteCommentAsync("test", commentId), Times.Once);
+        _commentServiceMock.Verify(x => x.DeleteCommentAsync("test", commentId, "AuthorizedUser", false), Times.Once);
     }
 
     [Fact]
