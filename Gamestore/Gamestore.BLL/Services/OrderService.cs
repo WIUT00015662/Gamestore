@@ -16,20 +16,20 @@ public class OrderService(
     private readonly IPaymentGatewayClient _paymentGatewayClient = paymentGatewayClient;
     private readonly OrderSettings _orderSettings = orderSettings;
 
-    public async Task AddGameToCartAsync(string gameKey)
+    public async Task AddGameToCartAsync(string gameKey, Guid userId)
     {
         var game = await _unitOfWork.Games.GetByKeyAsync(gameKey)
             ?? throw new EntityNotFoundException(nameof(Game), gameKey);
 
-        var order = await GetOrCreateOpenOrderAsync();
+        var order = await GetOrCreateOpenOrderAsync(userId);
         AddOrIncreaseOrderGame(order, game);
 
         await _unitOfWork.SaveChangesAsync();
     }
 
-    public async Task RemoveGameFromCartAsync(string gameKey)
+    public async Task RemoveGameFromCartAsync(string gameKey, Guid userId)
     {
-        var order = await _unitOfWork.Orders.GetOpenOrderByCustomerIdAsync(_orderSettings.CustomerId)
+        var order = await GetOpenOrderByUserAsync(userId)
             ?? throw new EntityNotFoundException(nameof(Order), "Open cart was not found.");
 
         var orderGame = order.OrderGames.FirstOrDefault(og => og.Product is not null && og.Product.Key == gameKey)
@@ -115,13 +115,61 @@ public class OrderService(
         await _unitOfWork.SaveChangesAsync();
     }
 
-    public async Task<IEnumerable<OrderResponse>> GetOrdersAsync()
+    /// <summary>
+    /// Get current user's orders (paid/cancelled/shipped, older than 30 days).
+    /// </summary>
+    public async Task<IEnumerable<OrderResponse>> GetMyOrdersAsync(Guid userId)
     {
         var orders = await _unitOfWork.Orders.GetByStatusesAsync(OrderStatus.Paid, OrderStatus.Cancelled, OrderStatus.Shipped);
-        var threshold = DateTime.UtcNow.AddDays(-30);
-        return orders.Where(o => o.Date is not null && o.Date <= threshold).ToOrderResponse();
+        return orders
+            .Where(o => o.CustomerId == userId)
+            .ToOrderResponse();
     }
 
+    /// <summary>
+    /// Get specific order for current user (with ownership check).
+    /// </summary>
+    public async Task<OrderResponse> GetMyOrderByIdAsync(Guid orderId, Guid userId)
+    {
+        var order = await _unitOfWork.Orders.GetByIdAsync(orderId)
+            ?? throw new EntityNotFoundException(nameof(Order), orderId);
+
+        if (order.CustomerId != userId)
+        {
+            throw new ArgumentException("Unauthorized access to this order.");
+        }
+
+        return order.ToOrderResponse();
+    }
+
+    /// <summary>
+    /// Get order details for current user's order.
+    /// </summary>
+    public async Task<IEnumerable<OrderGameResponse>> GetMyOrderDetailsAsync(Guid orderId, Guid userId)
+    {
+        var order = await _unitOfWork.Orders.GetByIdWithDetailsAsync(orderId)
+            ?? throw new EntityNotFoundException(nameof(Order), orderId);
+
+        if (order.CustomerId != userId)
+        {
+            throw new ArgumentException("Unauthorized access to this order.");
+        }
+
+        return order.OrderGames.ToOrderGameResponse();
+    }
+
+    /// <summary>
+    /// Get all orders (admin/manager only).
+    /// </summary>
+    public async Task<IEnumerable<OrderResponse>> GetAllOrdersAsync()
+    {
+        var orders = await _unitOfWork.Orders.GetByStatusesAsync(OrderStatus.Paid, OrderStatus.Cancelled, OrderStatus.Shipped);
+        return orders.ToOrderResponse();
+    }
+
+    /// <summary>
+    /// Get order by ID (admin/manager only).
+    /// </summary>
     public async Task<OrderResponse> GetOrderByIdAsync(Guid orderId)
     {
         var order = await _unitOfWork.Orders.GetByIdAsync(orderId)
@@ -130,6 +178,9 @@ public class OrderService(
         return order.ToOrderResponse();
     }
 
+    /// <summary>
+    /// Get order details (admin/manager only).
+    /// </summary>
     public async Task<IEnumerable<OrderGameResponse>> GetOrderDetailsAsync(Guid orderId)
     {
         var order = await _unitOfWork.Orders.GetByIdWithDetailsAsync(orderId)
@@ -138,9 +189,9 @@ public class OrderService(
         return order.OrderGames.ToOrderGameResponse();
     }
 
-    public async Task<IEnumerable<OrderGameResponse>> GetCartAsync()
+    public async Task<IEnumerable<OrderGameResponse>> GetCartAsync(Guid userId)
     {
-        var order = await _unitOfWork.Orders.GetOpenOrderByCustomerIdAsync(_orderSettings.CustomerId);
+        var order = await GetOpenOrderByUserAsync(userId);
         return order?.OrderGames.ToOrderGameResponse() ?? [];
     }
 
@@ -158,12 +209,6 @@ public class OrderService(
                 },
                 new PaymentMethodResponse
                 {
-                    ImageUrl = "https://encrypted-tbn1.gstatic.com/images?q=tbn:ANd9GcSzcJU0fSXRm3i6CGPBmhF5q6DR25GB7f6aXid3XUGWlWw-B581MA_qxEP6dY7R",
-                    Title = "IBox terminal",
-                    Description = "Pay in a terminal after invoice generation.",
-                },
-                new PaymentMethodResponse
-                {
                     ImageUrl = "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5c/Visa_Inc._logo_%282021%E2%80%93present%29.svg/1280px-Visa_Inc._logo_%282021%E2%80%93present%29.svg.png",
                     Title = "Visa",
                     Description = "Pay using your Visa card.",
@@ -172,9 +217,9 @@ public class OrderService(
         };
     }
 
-    public async Task<BankInvoiceResponse> PayByBankAsync()
+    public async Task<BankInvoiceResponse> PayByBankAsync(Guid userId)
     {
-        var order = await StartCheckoutAsync();
+        var order = await StartCheckoutAsync(userId);
         var sum = GetOrderSum(order);
         var createdAt = DateTime.UtcNow;
         var validUntil = createdAt.AddDays(_orderSettings.BankInvoiceValidityDays);
@@ -185,38 +230,14 @@ public class OrderService(
 
         return new BankInvoiceResponse
         {
-            Content = CreateInvoicePdf(_orderSettings.CustomerId, order.Id, createdAt, validUntil, sum),
+            Content = CreateInvoicePdf(order.CustomerId, order.Id, createdAt, validUntil, sum),
             FileName = $"invoice-{order.Id}.pdf",
         };
     }
 
-    public async Task<IBoxPaymentResponse> PayByIBoxAsync()
+    public async Task PayByVisaAsync(VisaPaymentModel model, Guid userId)
     {
-        var order = await StartCheckoutAsync();
-        var sum = GetOrderSum(order);
-        var paymentDate = DateTime.UtcNow;
-
-        for (var attempt = 0; attempt < _orderSettings.PaymentRetryCount; attempt++)
-        {
-            if (await _paymentGatewayClient.PayIBoxAsync(_orderSettings.CustomerId, order.Id, sum, paymentDate) is { } response)
-            {
-                order.Status = OrderStatus.Paid;
-                order.Date = paymentDate;
-                await _unitOfWork.SaveChangesAsync();
-                return response;
-            }
-        }
-
-        order.Status = OrderStatus.Cancelled;
-        order.Date = paymentDate;
-        await _unitOfWork.SaveChangesAsync();
-
-        throw new ArgumentException("IBox payment failed.");
-    }
-
-    public async Task PayByVisaAsync(VisaPaymentModel model)
-    {
-        var order = await StartCheckoutAsync();
+        var order = await StartCheckoutAsync(userId);
         var sum = GetOrderSum(order);
         var paymentDate = DateTime.UtcNow;
 
@@ -291,9 +312,9 @@ public class OrderService(
         return owner is null ? null : await _unitOfWork.Orders.GetByIdWithDetailsAsync(owner.Id);
     }
 
-    private async Task<Order> StartCheckoutAsync()
+    private async Task<Order> StartCheckoutAsync(Guid userId)
     {
-        var order = await _unitOfWork.Orders.GetOpenOrderByCustomerIdAsync(_orderSettings.CustomerId)
+        var order = await GetOpenOrderByUserAsync(userId)
             ?? throw new EntityNotFoundException(nameof(Order), "Open cart was not found.");
 
         if (order.OrderGames.Count == 0)
@@ -306,9 +327,9 @@ public class OrderService(
         return order;
     }
 
-    private async Task<Order> GetOrCreateOpenOrderAsync()
+    private async Task<Order> GetOrCreateOpenOrderAsync(Guid userId)
     {
-        var order = await _unitOfWork.Orders.GetOpenOrderByCustomerIdAsync(_orderSettings.CustomerId);
+        var order = await GetOpenOrderByUserAsync(userId);
         if (order is not null)
         {
             return order;
@@ -317,13 +338,19 @@ public class OrderService(
         order = new Order
         {
             Id = Guid.NewGuid(),
-            CustomerId = _orderSettings.CustomerId,
+            CustomerId = userId,
             Status = OrderStatus.Open,
         };
 
         await _unitOfWork.Orders.AddAsync(order);
         await _unitOfWork.SaveChangesAsync();
         return order;
+    }
+
+    private async Task<Order?> GetOpenOrderByUserAsync(Guid userId)
+    {
+        var orders = await _unitOfWork.Orders.GetByStatusesAsync(OrderStatus.Open);
+        return orders.FirstOrDefault(o => o.CustomerId == userId);
     }
 
     private static double GetOrderSum(Order order)

@@ -12,6 +12,11 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.Property(o => o.CustomerId).IsRequired();
         builder.Property(o => o.Status).IsRequired();
 
+        builder.HasOne(o => o.Customer)
+            .WithMany()
+            .HasForeignKey(o => o.CustomerId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         builder.HasMany(o => o.OrderGames)
             .WithOne(og => og.Order)
             .HasForeignKey(og => og.OrderId)

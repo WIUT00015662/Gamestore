@@ -1,4 +1,5 @@
 using Gamestore.Api.Auth;
+using Gamestore.Api.Services;
 using Gamestore.BLL.DTOs.Order;
 using Gamestore.BLL.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -8,36 +9,65 @@ namespace Gamestore.Api.Controllers;
 
 [ApiController]
 [Route("orders")]
-public class OrdersController(IOrderService orderService) : ControllerBase
+public class OrdersController(IOrderService orderService, ICurrentUserService currentUserService) : ControllerBase
 {
     private readonly IOrderService _orderService = orderService;
+    private readonly ICurrentUserService _currentUserService = currentUserService;
 
     [Authorize(Policy = Permissions.BuyGame)]
     [HttpDelete("cart/{key}")]
     public async Task<IActionResult> DeleteGameFromCart(string key)
     {
-        await _orderService.RemoveGameFromCartAsync(key);
+        var userId = _currentUserService.GetUserId();
+        await _orderService.RemoveGameFromCartAsync(key, userId);
         return NoContent();
     }
 
     [Authorize(Policy = Permissions.ViewOrderHistory)]
-    [HttpGet]
-    public async Task<IActionResult> GetOrders()
+    [HttpGet("my-orders")]
+    public async Task<IActionResult> GetMyOrders()
     {
-        var orders = await _orderService.GetOrdersAsync();
+        var userId = _currentUserService.GetUserId();
+        var orders = await _orderService.GetMyOrdersAsync(userId);
         return Ok(orders);
     }
 
     [Authorize(Policy = Permissions.ViewOrderHistory)]
-    [HttpGet("{id:guid}")]
-    public async Task<IActionResult> GetOrderById(Guid id)
+    [HttpGet("my-orders/{id:guid}")]
+    public async Task<IActionResult> GetMyOrder(Guid id)
+    {
+        var userId = _currentUserService.GetUserId();
+        var order = await _orderService.GetMyOrderByIdAsync(id, userId);
+        return Ok(order);
+    }
+
+    [Authorize(Policy = Permissions.ViewOrderHistory)]
+    [HttpGet("my-orders/{id:guid}/details")]
+    public async Task<IActionResult> GetMyOrderDetails(Guid id)
+    {
+        var userId = _currentUserService.GetUserId();
+        var details = await _orderService.GetMyOrderDetailsAsync(id, userId);
+        return Ok(details);
+    }
+
+    [Authorize(Policy = Permissions.ManageOrders)]
+    [HttpGet("all-orders")]
+    public async Task<IActionResult> GetAllOrders()
+    {
+        var orders = await _orderService.GetAllOrdersAsync();
+        return Ok(orders);
+    }
+
+    [Authorize(Policy = Permissions.ManageOrders)]
+    [HttpGet("all-orders/{id:guid}")]
+    public async Task<IActionResult> GetOrder(Guid id)
     {
         var order = await _orderService.GetOrderByIdAsync(id);
         return Ok(order);
     }
 
     [Authorize(Policy = Permissions.ManageOrders)]
-    [HttpGet("{id:guid}/details")]
+    [HttpGet("all-orders/{id:guid}/details")]
     public async Task<IActionResult> GetOrderDetails(Guid id)
     {
         var details = await _orderService.GetOrderDetailsAsync(id);
@@ -61,7 +91,7 @@ public class OrdersController(IOrderService orderService) : ControllerBase
     }
 
     [Authorize(Policy = Permissions.ShipOrder)]
-    [HttpPost("{id:guid}/ship")]
+    [HttpPost("all-orders/{id:guid}/ship")]
     public async Task<IActionResult> ShipOrder(Guid id)
     {
         await _orderService.ShipOrderAsync(id);
@@ -69,7 +99,7 @@ public class OrdersController(IOrderService orderService) : ControllerBase
     }
 
     [Authorize(Policy = Permissions.ManageOrders)]
-    [HttpPost("{id:guid}/details/{key}")]
+    [HttpPost("all-orders/{id:guid}/details/{key}")]
     public async Task<IActionResult> AddGameToOrder(Guid id, string key)
     {
         await _orderService.AddGameToOrderAsync(id, key);
@@ -80,7 +110,8 @@ public class OrdersController(IOrderService orderService) : ControllerBase
     [HttpGet("cart")]
     public async Task<IActionResult> GetCart()
     {
-        var cart = await _orderService.GetCartAsync();
+        var userId = _currentUserService.GetUserId();
+        var cart = await _orderService.GetCartAsync(userId);
         return Ok(cart);
     }
 
@@ -96,26 +127,17 @@ public class OrdersController(IOrderService orderService) : ControllerBase
     [HttpPost("payment")]
     public async Task<IActionResult> Pay([FromBody] PaymentRequest request)
     {
+        var userId = _currentUserService.GetUserId();
+
         if (request.Method.Equals("Bank", StringComparison.OrdinalIgnoreCase))
         {
-            var invoice = await _orderService.PayByBankAsync();
+            var invoice = await _orderService.PayByBankAsync(userId);
             return File(invoice.Content, "application/pdf", invoice.FileName);
-        }
-
-        if (request.Method.Equals("IBox terminal", StringComparison.OrdinalIgnoreCase))
-        {
-            var response = await _orderService.PayByIBoxAsync();
-            return Ok(response);
         }
 
         if (request.Method.Equals("Visa", StringComparison.OrdinalIgnoreCase))
         {
-            if (request.Model is null)
-            {
-                throw new ArgumentException("Visa model is required.");
-            }
-
-            await _orderService.PayByVisaAsync(request.Model);
+            await _orderService.PayByVisaAsync(request.Model, userId);
             return NoContent();
         }
 

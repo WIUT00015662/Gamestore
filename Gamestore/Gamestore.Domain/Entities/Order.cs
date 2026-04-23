@@ -8,6 +8,8 @@ public class Order
 
     public Guid CustomerId { get; set; }
 
+    public User Customer { get; set; }
+
     public OrderStatus Status { get; set; }
 
     public ICollection<OrderGame> OrderGames { get; set; } = [];

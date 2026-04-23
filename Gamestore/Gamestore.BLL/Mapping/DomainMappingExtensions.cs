@@ -79,6 +79,7 @@ internal static class DomainMappingExtensions
             Id = order.Id,
             CustomerId = order.CustomerId,
             Date = order.Date,
+            Status = (int)order.Status,
         };
     }
 

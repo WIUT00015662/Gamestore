@@ -15,6 +15,7 @@ public class OrderServiceTests
     private readonly Mock<IPaymentGatewayClient> _paymentGatewayClientMock;
     private readonly OrderSettings _orderSettings;
     private readonly OrderService _orderService;
+    private readonly Guid _testUserId = Guid.NewGuid();
 
     public OrderServiceTests()
     {
@@ -31,7 +32,6 @@ public class OrderServiceTests
 
         _orderSettings = new OrderSettings
         {
-            CustomerId = Guid.NewGuid(),
             BankInvoiceValidityDays = 3,
             PaymentRetryCount = 3,
         };
@@ -44,7 +44,7 @@ public class OrderServiceTests
     {
         _gameRepoMock.Setup(x => x.GetByKeyAsync("missing")).ReturnsAsync((Game?)null);
 
-        await Assert.ThrowsAsync<EntityNotFoundException>(() => _orderService.AddGameToCartAsync("missing"));
+        await Assert.ThrowsAsync<EntityNotFoundException>(() => _orderService.AddGameToCartAsync("missing", _testUserId));
     }
 
     [Fact]
@@ -52,11 +52,11 @@ public class OrderServiceTests
     {
         var game = new Game { Id = Guid.NewGuid(), Name = "Test", Key = "test", Price = 100, UnitInStock = 5, Discount = 10 };
         _gameRepoMock.Setup(x => x.GetByKeyAsync(game.Key)).ReturnsAsync(game);
-        _orderRepoMock.Setup(r => r.GetOpenOrderByCustomerIdAsync(_orderSettings.CustomerId)).ReturnsAsync((Order?)null);
+        _orderRepoMock.Setup(r => r.GetByStatusesAsync(It.IsAny<OrderStatus[]>())).ReturnsAsync([]);
 
-        await _orderService.AddGameToCartAsync(game.Key);
+        await _orderService.AddGameToCartAsync(game.Key, _testUserId);
 
-        _orderRepoMock.Verify(r => r.AddAsync(It.Is<Order>(o => o.CustomerId == _orderSettings.CustomerId && o.Status == OrderStatus.Open)), Times.Once);
+        _orderRepoMock.Verify(r => r.AddAsync(It.Is<Order>(o => o.CustomerId == _testUserId && o.Status == OrderStatus.Open)), Times.Once);
         _unitOfWorkMock.Verify(u => u.SaveChangesAsync(), Times.Exactly(2));
     }
 
@@ -67,7 +67,7 @@ public class OrderServiceTests
         var order = new Order
         {
             Id = Guid.NewGuid(),
-            CustomerId = _orderSettings.CustomerId,
+            CustomerId = _testUserId,
             Status = OrderStatus.Open,
             OrderGames =
             [
@@ -76,9 +76,9 @@ public class OrderServiceTests
         };
 
         _gameRepoMock.Setup(x => x.GetByKeyAsync(game.Key)).ReturnsAsync(game);
-        _orderRepoMock.Setup(r => r.GetOpenOrderByCustomerIdAsync(_orderSettings.CustomerId)).ReturnsAsync(order);
+        _orderRepoMock.Setup(r => r.GetByStatusesAsync(It.IsAny<OrderStatus[]>())).ReturnsAsync([order]);
 
-        await _orderService.AddGameToCartAsync(game.Key);
+        await _orderService.AddGameToCartAsync(game.Key, _testUserId);
 
         Assert.Equal(2, order.OrderGames.Single().Quantity);
         _unitOfWorkMock.Verify(u => u.SaveChangesAsync(), Times.Once);
@@ -91,7 +91,7 @@ public class OrderServiceTests
         var order = new Order
         {
             Id = Guid.NewGuid(),
-            CustomerId = _orderSettings.CustomerId,
+            CustomerId = _testUserId,
             Status = OrderStatus.Open,
             OrderGames =
             [
@@ -99,9 +99,9 @@ public class OrderServiceTests
             ],
         };
 
-        _orderRepoMock.Setup(r => r.GetOpenOrderByCustomerIdAsync(_orderSettings.CustomerId)).ReturnsAsync(order);
+        _orderRepoMock.Setup(r => r.GetOpenOrderByCustomerIdAsync(_testUserId)).ReturnsAsync(order);
 
-        await _orderService.RemoveGameFromCartAsync(game.Key);
+        await _orderService.RemoveGameFromCartAsync(game.Key, _testUserId);
 
         Assert.Empty(order.OrderGames);
         _orderRepoMock.Verify(r => r.Delete(order), Times.Once);
@@ -111,70 +111,31 @@ public class OrderServiceTests
     [Fact]
     public async Task GetCartAsyncReturnsEmptyCollectionWhenNoOpenOrder()
     {
-        _orderRepoMock.Setup(r => r.GetOpenOrderByCustomerIdAsync(_orderSettings.CustomerId)).ReturnsAsync((Order?)null);
+        _orderRepoMock.Setup(r => r.GetByStatusesAsync(It.IsAny<OrderStatus[]>())).ReturnsAsync([]);
 
-        var result = await _orderService.GetCartAsync();
+        var result = await _orderService.GetCartAsync(_testUserId);
 
         Assert.Empty(result);
     }
 
     [Fact]
-    public void GetPaymentMethodsReturnsThreeMethods()
+    public void GetPaymentMethodsReturnsTwoMethods()
     {
         var result = _orderService.GetPaymentMethods();
 
-        Assert.Equal(3, result.PaymentMethods.Count());
+        Assert.Equal(2, result.PaymentMethods.Count());
         Assert.Contains(result.PaymentMethods, p => p.Title == "Bank");
-        Assert.Contains(result.PaymentMethods, p => p.Title == "IBox terminal");
         Assert.Contains(result.PaymentMethods, p => p.Title == "Visa");
-    }
-
-    [Fact]
-    public async Task PayByIBoxAsyncRetriesAndMarksOrderPaidWhenGatewayReturnsResponse()
-    {
-        var order = new Order
-        {
-            Id = Guid.NewGuid(),
-            CustomerId = _orderSettings.CustomerId,
-            Status = OrderStatus.Open,
-            OrderGames =
-            [
-                new OrderGame { ProductId = Guid.NewGuid(), Price = 50, Quantity = 2, Discount = 10 },
-            ],
-        };
-
-        var paymentResponse = new IBoxPaymentResponse
-        {
-            UserId = _orderSettings.CustomerId,
-            OrderId = order.Id,
-            PaymentDate = DateTime.UtcNow,
-            Sum = 90,
-        };
-
-        _orderRepoMock.Setup(r => r.GetOpenOrderByCustomerIdAsync(_orderSettings.CustomerId)).ReturnsAsync(order);
-        _paymentGatewayClientMock
-            .SetupSequence(p => p.PayIBoxAsync(_orderSettings.CustomerId, order.Id, It.IsAny<double>(), It.IsAny<DateTime>()))
-            .ReturnsAsync((IBoxPaymentResponse?)null)
-            .ReturnsAsync(paymentResponse);
-
-        var result = await _orderService.PayByIBoxAsync();
-
-        Assert.Same(paymentResponse, result);
-        Assert.Equal(OrderStatus.Paid, order.Status);
-        Assert.NotNull(order.Date);
-        _paymentGatewayClientMock.Verify(
-            p => p.PayIBoxAsync(_orderSettings.CustomerId, order.Id, It.IsAny<double>(), It.IsAny<DateTime>()),
-            Times.Exactly(2));
-        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(), Times.Exactly(2));
     }
 
     [Fact]
     public async Task PayByVisaAsyncThrowsAndCancelsOrderWhenAllRetriesFail()
     {
+        var userId = Guid.NewGuid();
         var order = new Order
         {
             Id = Guid.NewGuid(),
-            CustomerId = _orderSettings.CustomerId,
+            CustomerId = userId,
             Status = OrderStatus.Open,
             OrderGames =
             [
@@ -190,10 +151,10 @@ public class OrderServiceTests
             Cvv2 = 123,
         };
 
-        _orderRepoMock.Setup(r => r.GetOpenOrderByCustomerIdAsync(_orderSettings.CustomerId)).ReturnsAsync(order);
+        _orderRepoMock.Setup(r => r.GetByStatusesAsync(It.IsAny<OrderStatus[]>())).ReturnsAsync([order]);
         _paymentGatewayClientMock.Setup(p => p.PayVisaAsync(model, It.IsAny<double>())).ReturnsAsync(false);
 
-        await Assert.ThrowsAsync<ArgumentException>(() => _orderService.PayByVisaAsync(model));
+        await Assert.ThrowsAsync<ArgumentException>(() => _orderService.PayByVisaAsync(model, userId));
 
         Assert.Equal(OrderStatus.Cancelled, order.Status);
         Assert.NotNull(order.Date);
@@ -204,10 +165,11 @@ public class OrderServiceTests
     [Fact]
     public async Task PayByVisaAsyncMarksOrderPaidWhenPaymentSucceeds()
     {
+        var userId = Guid.NewGuid();
         var order = new Order
         {
             Id = Guid.NewGuid(),
-            CustomerId = _orderSettings.CustomerId,
+            CustomerId = userId,
             Status = OrderStatus.Open,
             OrderGames =
             [
@@ -223,10 +185,10 @@ public class OrderServiceTests
             Cvv2 = 123,
         };
 
-        _orderRepoMock.Setup(r => r.GetOpenOrderByCustomerIdAsync(_orderSettings.CustomerId)).ReturnsAsync(order);
+        _orderRepoMock.Setup(r => r.GetByStatusesAsync(It.IsAny<OrderStatus[]>())).ReturnsAsync([order]);
         _paymentGatewayClientMock.Setup(p => p.PayVisaAsync(model, It.IsAny<double>())).ReturnsAsync(true);
 
-        await _orderService.PayByVisaAsync(model);
+        await _orderService.PayByVisaAsync(model, userId);
 
         Assert.Equal(OrderStatus.Paid, order.Status);
         Assert.NotNull(order.Date);
