@@ -129,18 +129,18 @@ public class OrdersController(IOrderService orderService, ICurrentUserService cu
     {
         var userId = _currentUserService.GetUserId();
 
-        if (request.Method.Equals("Bank", StringComparison.OrdinalIgnoreCase))
+        if (request.Method is PaymentMethodType.Bank)
         {
             var invoice = await _orderService.PayByBankAsync(userId);
             return File(invoice.Content, "application/pdf", invoice.FileName);
         }
 
-        if (request.Method.Equals("Visa", StringComparison.OrdinalIgnoreCase))
+        if (request.Method is PaymentMethodType.Visa)
         {
-            await _orderService.PayByVisaAsync(request.Model, userId);
+            await _orderService.PayByVisaAsync(request.Model!, userId);
             return NoContent();
         }
 
-        throw new ArgumentException($"Unsupported payment method: {request.Method}");
+        throw new ArgumentException($"Unsupported payment method: {request.Method?.ToString() ?? "null"}");
     }
 }

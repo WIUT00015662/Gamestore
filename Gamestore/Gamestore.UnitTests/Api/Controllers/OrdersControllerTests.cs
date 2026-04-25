@@ -145,7 +145,7 @@ public class OrdersControllerTests
 
         _orderServiceMock.Setup(s => s.PayByBankAsync(_testUserId)).ReturnsAsync(invoice);
 
-        var result = await _controller.Pay(new PaymentRequest { Method = "Bank" });
+        var result = await _controller.Pay(new PaymentRequest { Method = PaymentMethodType.Bank });
 
         var fileResult = Assert.IsType<FileContentResult>(result);
         Assert.Equal("application/pdf", fileResult.ContentType);
@@ -169,7 +169,7 @@ public class OrdersControllerTests
 
         var result = await _controller.Pay(new PaymentRequest
         {
-            Method = "Visa",
+            Method = PaymentMethodType.Visa,
             Model = model,
         });
 
@@ -180,7 +180,7 @@ public class OrdersControllerTests
     [Fact]
     public async Task PayThrowsWhenMethodIsUnsupported()
     {
-        var request = new PaymentRequest { Method = "Cash" };
+        var request = new PaymentRequest { Method = (PaymentMethodType)999 };
 
         await Assert.ThrowsAsync<ArgumentException>(() => _controller.Pay(request));
     }
