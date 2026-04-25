@@ -4,5 +4,5 @@ namespace Gamestore.Domain.Repositories;
 
 public interface ICommentBanRepository : IRepository<CommentBan>
 {
-    Task<CommentBan?> GetByNameAsync(string name);
+    Task<CommentBan?> GetByUserIdAsync(Guid userId);
 }

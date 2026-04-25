@@ -9,23 +9,23 @@ public class CommentService(IUnitOfWork unitOfWork) : ICommentService
 {
     private const string DeletedMessage = "A comment/quote was deleted";
 
-    private static readonly IReadOnlyDictionary<string, TimeSpan?> BanDurations = new Dictionary<string, TimeSpan?>(StringComparer.OrdinalIgnoreCase)
+    private static readonly IReadOnlyDictionary<BanDurationType, TimeSpan?> BanDurations = new Dictionary<BanDurationType, TimeSpan?>
     {
-        ["1 hour"] = TimeSpan.FromHours(1),
-        ["1 day"] = TimeSpan.FromDays(1),
-        ["1 week"] = TimeSpan.FromDays(7),
-        ["1 month"] = TimeSpan.FromDays(30),
-        ["permanent"] = null,
+        [BanDurationType.OneHour] = TimeSpan.FromHours(1),
+        [BanDurationType.OneDay] = TimeSpan.FromDays(1),
+        [BanDurationType.OneWeek] = TimeSpan.FromDays(7),
+        [BanDurationType.OneMonth] = TimeSpan.FromDays(30),
+        [BanDurationType.Permanent] = null,
     };
 
     private readonly IUnitOfWork _unitOfWork = unitOfWork;
 
-    public async Task AddCommentAsync(string gameKey, AddCommentRequest request)
+    public async Task AddCommentAsync(string gameKey, AddCommentRequest request, Guid actorUserId, string actorName)
     {
         var game = await _unitOfWork.Games.GetByKeyAsync(gameKey)
             ?? throw new EntityNotFoundException(nameof(Game), gameKey);
 
-        if (await IsUserBannedAsync(request.Comment.Name))
+        if (await IsUserBannedAsync(actorUserId))
         {
             throw new ArgumentException("User is banned from commenting.");
         }
@@ -63,7 +63,8 @@ public class CommentService(IUnitOfWork unitOfWork) : ICommentService
         var comment = new Comment
         {
             Id = Guid.NewGuid(),
-            Name = request.Comment.Name,
+            AuthorUserId = actorUserId,
+            Name = actorName,
             Body = finalBody,
             ParentCommentId = request.ParentId,
             QuotedCommentId = quotedCommentId,
@@ -92,6 +93,7 @@ public class CommentService(IUnitOfWork unitOfWork) : ICommentService
                     .Select(comment => new CommentResponse
                     {
                         Id = comment.Id,
+                        AuthorUserId = comment.AuthorUserId,
                         Name = comment.Name,
                         Body = comment.Body,
                         IsDeleted = comment.IsDeleted,
@@ -103,7 +105,7 @@ public class CommentService(IUnitOfWork unitOfWork) : ICommentService
         return BuildTree(null);
     }
 
-    public async Task UpdateCommentAsync(string gameKey, Guid commentId, UpdateCommentRequest request, string actorName)
+    public async Task UpdateCommentAsync(string gameKey, Guid commentId, UpdateCommentRequest request, Guid actorUserId, string actorName)
     {
         var game = await _unitOfWork.Games.GetByKeyIncludingDeletedAsync(gameKey)
             ?? throw new EntityNotFoundException(nameof(Game), gameKey);
@@ -116,7 +118,11 @@ public class CommentService(IUnitOfWork unitOfWork) : ICommentService
             throw new ArgumentException("Comment does not belong to the specified game.");
         }
 
-        if (!comment.Name.Equals(actorName, StringComparison.OrdinalIgnoreCase))
+        var isOwner = comment.AuthorUserId.HasValue
+            ? comment.AuthorUserId.Value == actorUserId
+            : comment.Name.Equals(actorName, StringComparison.OrdinalIgnoreCase);
+
+        if (!isOwner)
         {
             throw new ArgumentException("Only comment owner can edit comment.");
         }
@@ -134,7 +140,7 @@ public class CommentService(IUnitOfWork unitOfWork) : ICommentService
         await _unitOfWork.SaveChangesAsync();
     }
 
-    public async Task DeleteCommentAsync(string gameKey, Guid commentId, string actorName, bool canManageComments)
+    public async Task DeleteCommentAsync(string gameKey, Guid commentId, Guid actorUserId, string actorName, bool canManageComments)
     {
         var game = await _unitOfWork.Games.GetByKeyIncludingDeletedAsync(gameKey)
             ?? throw new EntityNotFoundException(nameof(Game), gameKey);
@@ -147,7 +153,11 @@ public class CommentService(IUnitOfWork unitOfWork) : ICommentService
             throw new ArgumentException("Comment does not belong to the specified game.");
         }
 
-        if (!canManageComments && !comment.Name.Equals(actorName, StringComparison.OrdinalIgnoreCase))
+        var isOwner = comment.AuthorUserId.HasValue
+            ? comment.AuthorUserId.Value == actorUserId
+            : comment.Name.Equals(actorName, StringComparison.OrdinalIgnoreCase);
+
+        if (!canManageComments && !isOwner)
         {
             throw new ArgumentException("Only comment owner or moderator can delete comment.");
         }
@@ -166,19 +176,27 @@ public class CommentService(IUnitOfWork unitOfWork) : ICommentService
         await _unitOfWork.SaveChangesAsync();
     }
 
-    public IEnumerable<string> GetBanDurations()
+    public IEnumerable<BanDurationType> GetBanDurations()
     {
-        return BanDurations.Keys;
+        return Enum.GetValues<BanDurationType>();
     }
 
     public async Task BanUserAsync(BanUserRequest request)
     {
-        if (!BanDurations.TryGetValue(request.Duration.Trim(), out var duration))
+        if (request.Duration is null)
         {
-            throw new ArgumentException($"Unsupported ban duration: {request.Duration}");
+            throw new ArgumentException("Ban duration is required.");
         }
 
-        var existingBan = await _unitOfWork.CommentBans.GetByNameAsync(request.User);
+        if (!BanDurations.TryGetValue(request.Duration.Value, out var duration))
+        {
+            throw new ArgumentException($"Unsupported ban duration: {request.Duration.Value}");
+        }
+
+        var user = await _unitOfWork.Users.GetByIdAsync(request.UserId)
+            ?? throw new EntityNotFoundException(nameof(User), request.UserId);
+
+        var existingBan = await _unitOfWork.CommentBans.GetByUserIdAsync(request.UserId);
         var now = DateTime.UtcNow;
 
         if (existingBan is null)
@@ -186,10 +204,15 @@ public class CommentService(IUnitOfWork unitOfWork) : ICommentService
             existingBan = new CommentBan
             {
                 Id = Guid.NewGuid(),
-                Name = request.User,
+                UserId = user.Id,
+                Name = user.Name,
             };
 
             await _unitOfWork.CommentBans.AddAsync(existingBan);
+        }
+        else
+        {
+            existingBan.Name = user.Name;
         }
 
         existingBan.IsPermanent = duration is null;
@@ -198,23 +221,27 @@ public class CommentService(IUnitOfWork unitOfWork) : ICommentService
         await _unitOfWork.SaveChangesAsync();
     }
 
-    public async Task<IEnumerable<string>> SearchUserNamesAsync(string query, int take)
+    public async Task<IEnumerable<UserLookupResponse>> SearchUsersAsync(string query, int take)
     {
         var users = await _unitOfWork.Users.GetAllAsync();
         var normalized = query.Trim();
         var limit = Math.Clamp(take, 1, 50);
 
         return users
-            .Select(u => u.Name)
-            .Where(name => string.IsNullOrWhiteSpace(normalized) || name.Contains(normalized, StringComparison.OrdinalIgnoreCase))
-            .OrderBy(name => name)
+            .Where(user => string.IsNullOrWhiteSpace(normalized) || user.Name.Contains(normalized, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(user => user.Name)
             .Take(limit)
+            .Select(user => new UserLookupResponse
+            {
+                Id = user.Id,
+                Name = user.Name,
+            })
             .ToList();
     }
 
-    private async Task<bool> IsUserBannedAsync(string name)
+    private async Task<bool> IsUserBannedAsync(Guid userId)
     {
-        var ban = await _unitOfWork.CommentBans.GetByNameAsync(name);
+        var ban = await _unitOfWork.CommentBans.GetByUserIdAsync(userId);
         return ban is not null
             && (ban.IsPermanent || (ban.BannedUntil is { } bannedUntil && bannedUntil > DateTime.UtcNow));
     }

@@ -4,6 +4,8 @@ public class CommentResponse
 {
     public Guid Id { get; set; }
 
+    public Guid? AuthorUserId { get; set; }
+
     public required string Name { get; set; }
 
     public required string Body { get; set; }

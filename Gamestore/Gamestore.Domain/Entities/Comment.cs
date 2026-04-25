@@ -4,6 +4,8 @@ public class Comment
 {
     public Guid Id { get; set; }
 
+    public Guid? AuthorUserId { get; set; }
+
     public required string Name { get; set; }
 
     public required string Body { get; set; }
@@ -23,6 +25,8 @@ public class Comment
     public Comment? QuotedComment { get; set; }
 
     public ICollection<Comment> QuotedByComments { get; set; } = [];
+
+    public User? AuthorUser { get; set; }
 
     public Game? Game { get; set; }
 }

@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Gamestore.Api.Auth;
 using Gamestore.Api.Controllers;
+using Gamestore.Api.Models;
 using Gamestore.Api.Services;
 using Gamestore.BLL.DTOs.Comment;
 using Gamestore.BLL.DTOs.Game;
@@ -36,6 +37,8 @@ public class GamesControllerTests
         _commentServiceMock = new Mock<ICommentService>();
         _currentUserServiceMock = new Mock<ICurrentUserService>();
         _currentUserServiceMock.Setup(s => s.GetUserId()).Returns(_testUserId);
+        _currentUserServiceMock.Setup(s => s.GetUserName()).Returns("AuthorizedUser");
+        _currentUserServiceMock.Setup(s => s.HasPermission(It.IsAny<string>())).Returns(false);
 
         _controller = new GamesController(
             _gameServiceMock.Object,
@@ -106,7 +109,7 @@ public class GamesControllerTests
         var response = new GetGamesResponse { Games = responses, TotalPages = 1, CurrentPage = 1 };
         _gameServiceMock.Setup(s => s.GetGamesWithFiltersAsync(It.IsAny<GameFilterRequest>())).ReturnsAsync(response);
 
-        var result = await _controller.GetAllGames(null, null, null, null, null, null, null, null, "10", 1);
+        var result = await _controller.GetAllGames(new GetGamesQueryRequest { PageSize = "10", PageNumber = 1 });
 
         var okResult = Assert.IsType<OkObjectResult>(result);
         var returnedResponse = Assert.IsType<GetGamesResponse>(okResult.Value);
@@ -210,35 +213,18 @@ public class GamesControllerTests
     }
 
     [Fact]
-    public async Task DownloadGameFileReturnsFileResult()
-    {
-        var fileResponse = new GameFileResponse
-        {
-            Content = System.Text.Encoding.UTF8.GetBytes("test content"),
-            FileName = "test.txt",
-        };
-        _gameServiceMock.Setup(s => s.DownloadGameFileAsync("test")).ReturnsAsync(fileResponse);
-
-        var result = await _controller.DownloadGameFile("test");
-
-        var fileResult = Assert.IsType<FileContentResult>(result);
-        Assert.Equal("text/plain", fileResult.ContentType);
-        Assert.Equal("test.txt", fileResult.FileDownloadName);
-    }
-
-    [Fact]
     public async Task AddCommentReturnsNoContent()
     {
         var request = new AddCommentRequest
         {
             Comment = new CommentBodyDto { Name = "John", Body = "Hello" },
         };
-        _commentServiceMock.Setup(x => x.AddCommentAsync("test", request)).Returns(Task.CompletedTask);
+        _commentServiceMock.Setup(x => x.AddCommentAsync("test", request, _testUserId, "AuthorizedUser")).Returns(Task.CompletedTask);
 
         var result = await _controller.AddComment("test", request);
 
         Assert.IsType<NoContentResult>(result);
-        _commentServiceMock.Verify(x => x.AddCommentAsync("test", request), Times.Once);
+        _commentServiceMock.Verify(x => x.AddCommentAsync("test", request, _testUserId, "AuthorizedUser"), Times.Once);
     }
 
     [Fact]
@@ -260,7 +246,7 @@ public class GamesControllerTests
     public async Task DeleteCommentReturnsNoContent()
     {
         var commentId = Guid.NewGuid();
-        _commentServiceMock.Setup(x => x.DeleteCommentAsync("test", commentId, It.IsAny<string>(), It.IsAny<bool>())).Returns(Task.CompletedTask);
+        _commentServiceMock.Setup(x => x.DeleteCommentAsync("test", commentId, _testUserId, "AuthorizedUser", false)).Returns(Task.CompletedTask);
 
         var identity = new ClaimsIdentity([new Claim(ClaimTypes.Name, "AuthorizedUser")], "TestAuth");
         _controller.ControllerContext = new ControllerContext
@@ -274,7 +260,7 @@ public class GamesControllerTests
         var result = await _controller.DeleteComment("test", commentId);
 
         Assert.IsType<NoContentResult>(result);
-        _commentServiceMock.Verify(x => x.DeleteCommentAsync("test", commentId, "AuthorizedUser", false), Times.Once);
+        _commentServiceMock.Verify(x => x.DeleteCommentAsync("test", commentId, _testUserId, "AuthorizedUser", false), Times.Once);
     }
 
     [Fact]
@@ -321,7 +307,7 @@ public class GamesControllerTests
 
         _gameServiceMock.Setup(s => s.GetGamesWithFiltersAsync(It.IsAny<GameFilterRequest>())).ReturnsAsync(response);
 
-        var result = await _controller.GetAllGames(null, null, null, null, null, null, null, null, "10", 1);
+        var result = await _controller.GetAllGames(new GetGamesQueryRequest { PageSize = "10", PageNumber = 1 });
 
         var okResult = Assert.IsType<OkObjectResult>(result);
         var returnedResponse = Assert.IsType<GetGamesResponse>(okResult.Value);
@@ -352,6 +338,7 @@ public class GamesControllerTests
         };
 
         _gameServiceMock.Setup(s => s.GetAllGamesAsync(false)).ReturnsAsync(games);
+        _currentUserServiceMock.Setup(s => s.HasPermission(Permissions.ViewDeletedGames)).Returns(false);
 
         var result = await _controller.GetAllGamesWithoutFilters();
 
@@ -368,17 +355,8 @@ public class GamesControllerTests
             new() { Id = Guid.NewGuid(), Name = "Deleted Test", Key = "deleted-test" },
         };
 
-        var claims = new List<Claim> { new("permission", Permissions.ViewDeletedGames) };
-        var identity = new ClaimsIdentity(claims, "TestAuth");
-        _controller.ControllerContext = new ControllerContext
-        {
-            HttpContext = new DefaultHttpContext
-            {
-                User = new ClaimsPrincipal(identity),
-            },
-        };
-
         _gameServiceMock.Setup(s => s.GetAllGamesAsync(true)).ReturnsAsync(games);
+        _currentUserServiceMock.Setup(s => s.HasPermission(Permissions.ViewDeletedGames)).Returns(true);
 
         var result = await _controller.GetAllGamesWithoutFilters();
 
@@ -395,27 +373,12 @@ public class GamesControllerTests
             Comment = new CommentBodyDto { Name = "Original", Body = "Hello" },
         };
 
-        var identity = new ClaimsIdentity(
-        [
-            new Claim(ClaimTypes.Name, "AuthorizedUser"),
-        ],
-        "TestAuth");
-
-        _controller.ControllerContext = new ControllerContext
-        {
-            HttpContext = new DefaultHttpContext
-            {
-                User = new ClaimsPrincipal(identity),
-            },
-        };
-
-        _commentServiceMock.Setup(x => x.AddCommentAsync("test", request)).Returns(Task.CompletedTask);
+        _commentServiceMock.Setup(x => x.AddCommentAsync("test", request, _testUserId, "AuthorizedUser")).Returns(Task.CompletedTask);
 
         var result = await _controller.AddComment("test", request);
 
         Assert.IsType<NoContentResult>(result);
-        Assert.Equal("AuthorizedUser", request.Comment.Name);
-        _commentServiceMock.Verify(x => x.AddCommentAsync("test", request), Times.Once);
+        _commentServiceMock.Verify(x => x.AddCommentAsync("test", request, _testUserId, "AuthorizedUser"), Times.Once);
     }
 
     [Fact]
@@ -452,5 +415,19 @@ public class GamesControllerTests
 
         Assert.IsType<NoContentResult>(result);
         _gameServiceMock.Verify(s => s.UpdateGameAsync(request, true), Times.Once);
+    }
+
+    [Fact]
+    public async Task DeleteCommentUsesCurrentUserServiceIdentityAndPermissions()
+    {
+        var commentId = Guid.NewGuid();
+        _currentUserServiceMock.Setup(s => s.GetUserName()).Returns("AuthorizedUser");
+        _currentUserServiceMock.Setup(s => s.HasPermission(Permissions.ManageComments)).Returns(true);
+        _commentServiceMock.Setup(x => x.DeleteCommentAsync("test", commentId, _testUserId, "AuthorizedUser", true)).Returns(Task.CompletedTask);
+
+        var result = await _controller.DeleteComment("test", commentId);
+
+        Assert.IsType<NoContentResult>(result);
+        _commentServiceMock.Verify(x => x.DeleteCommentAsync("test", commentId, _testUserId, "AuthorizedUser", true), Times.Once);
     }
 }

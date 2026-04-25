@@ -20,7 +20,7 @@ public class CommentsControllerTests
     [Fact]
     public void GetBanDurationsReturnsOkWithDurations()
     {
-        var durations = new List<string> { "1 hour", "1 day", "permanent" };
+        var durations = new List<BanDurationType> { BanDurationType.OneHour, BanDurationType.OneDay, BanDurationType.Permanent };
         _commentServiceMock.Setup(x => x.GetBanDurations()).Returns(durations);
 
         var result = _controller.GetBanDurations();
@@ -30,9 +30,25 @@ public class CommentsControllerTests
     }
 
     [Fact]
+    public async Task SearchUsersReturnsOkWithUsers()
+    {
+        var users = new List<UserLookupResponse>
+        {
+            new() { Id = Guid.NewGuid(), Name = "John" },
+        };
+
+        _commentServiceMock.Setup(x => x.SearchUsersAsync("jo", 20)).ReturnsAsync(users);
+
+        var result = await _controller.SearchUsers("jo", 20);
+
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        Assert.Same(users, okResult.Value);
+    }
+
+    [Fact]
     public async Task BanUserReturnsNoContent()
     {
-        var request = new BanUserRequest { User = "John", Duration = "1 week" };
+        var request = new BanUserRequest { UserId = Guid.NewGuid(), Duration = BanDurationType.OneWeek };
         _commentServiceMock.Setup(x => x.BanUserAsync(request)).Returns(Task.CompletedTask);
 
         var result = await _controller.BanUser(request);

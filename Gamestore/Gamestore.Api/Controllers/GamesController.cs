@@ -1,4 +1,5 @@
 using Gamestore.Api.Auth;
+using Gamestore.Api.Models;
 using Gamestore.Api.Services;
 using Gamestore.BLL.DTOs.Comment;
 using Gamestore.BLL.DTOs.Game;
@@ -68,30 +69,20 @@ public class GamesController(
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetAllGames(
-        [FromQuery(Name = "genres")] Guid[]? genreIds,
-        [FromQuery(Name = "platforms")] Guid[]? platformIds,
-        [FromQuery(Name = "publishers")] Guid[]? publisherIds,
-        [FromQuery(Name = "minPrice")] double? minPrice,
-        [FromQuery(Name = "maxPrice")] double? maxPrice,
-        [FromQuery(Name = "datePublishing")] string? publishDateFilter,
-        [FromQuery(Name = "name")] string? gameName,
-        [FromQuery(Name = "sort")] string? sortBy,
-        [FromQuery(Name = "pageCount")] string? pageSize,
-        [FromQuery(Name = "page")] int pageNumber = 1)
+    public async Task<IActionResult> GetAllGames([FromQuery] GetGamesQueryRequest query)
     {
         var request = new GameFilterRequest
         {
-            GenreIds = genreIds?.ToList(),
-            PlatformIds = platformIds?.ToList(),
-            PublisherIds = publisherIds?.ToList(),
-            MinPrice = minPrice,
-            MaxPrice = maxPrice,
-            PublishDateFilter = publishDateFilter,
-            GameName = gameName,
-            SortBy = sortBy,
-            PageSize = pageSize ?? "10",
-            PageNumber = pageNumber,
+            GenreIds = query.GenreIds?.ToList(),
+            PlatformIds = query.PlatformIds?.ToList(),
+            PublisherIds = query.PublisherIds?.ToList(),
+            MinPrice = query.MinPrice,
+            MaxPrice = query.MaxPrice,
+            PublishDateFilter = query.PublishDateFilter,
+            GameName = query.GameName,
+            SortBy = query.SortBy,
+            PageSize = query.PageSize ?? "10",
+            PageNumber = query.PageNumber,
         };
 
         var result = await _gameService.GetGamesWithFiltersAsync(request);
@@ -102,7 +93,7 @@ public class GamesController(
     [HttpGet("all")]
     public async Task<IActionResult> GetAllGamesWithoutFilters()
     {
-        var includeDeleted = User.HasClaim("permission", Permissions.ViewDeletedGames);
+        var includeDeleted = _currentUserService.HasPermission(Permissions.ViewDeletedGames);
         var games = await _gameService.GetAllGamesAsync(includeDeleted);
         return Ok(games);
     }
@@ -128,8 +119,9 @@ public class GamesController(
     [HttpPost("{key}/comments")]
     public async Task<IActionResult> AddComment(string key, [FromBody] AddCommentRequest request)
     {
-        request.Comment.Name = User.Identity?.Name ?? request.Comment.Name;
-        await _commentService.AddCommentAsync(key, request);
+        var actorUserId = _currentUserService.GetUserId();
+        var actorName = _currentUserService.GetUserName();
+        await _commentService.AddCommentAsync(key, request, actorUserId, actorName);
         return NoContent();
     }
 
@@ -157,13 +149,6 @@ public class GamesController(
         return NoContent();
     }
 
-    [HttpGet("{key}/file")]
-    public async Task<IActionResult> DownloadGameFile(string key)
-    {
-        var file = await _gameService.DownloadGameFileAsync(key);
-        return File(file.Content, "text/plain", file.FileName);
-    }
-
     [HttpGet("{key}/genres")]
     public async Task<IActionResult> GetGenresByGameKey(string key)
     {
@@ -189,8 +174,9 @@ public class GamesController(
     [HttpPut("{key}/comments/{id:guid}")]
     public async Task<IActionResult> UpdateComment(string key, Guid id, [FromBody] UpdateCommentRequest request)
     {
-        var actorName = User.Identity?.Name ?? throw new ArgumentException("Authenticated user name is required.");
-        await _commentService.UpdateCommentAsync(key, id, request, actorName);
+        var actorUserId = _currentUserService.GetUserId();
+        var actorName = _currentUserService.GetUserName();
+        await _commentService.UpdateCommentAsync(key, id, request, actorUserId, actorName);
         return NoContent();
     }
 
@@ -198,9 +184,10 @@ public class GamesController(
     [HttpDelete("{key}/comments/{id:guid}")]
     public async Task<IActionResult> DeleteComment(string key, Guid id)
     {
-        var actorName = User.Identity?.Name ?? throw new ArgumentException("Authenticated user name is required.");
-        var canManageComments = User.HasClaim("permission", Permissions.ManageComments);
-        await _commentService.DeleteCommentAsync(key, id, actorName, canManageComments);
+        var actorUserId = _currentUserService.GetUserId();
+        var actorName = _currentUserService.GetUserName();
+        var canManageComments = _currentUserService.HasPermission(Permissions.ManageComments);
+        await _commentService.DeleteCommentAsync(key, id, actorUserId, actorName, canManageComments);
         return NoContent();
     }
 }

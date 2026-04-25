@@ -7,8 +7,8 @@ namespace Gamestore.DAL.Repositories;
 
 public class CommentBanRepository(GamestoreDbContext context) : Repository<CommentBan>(context), ICommentBanRepository
 {
-    public async Task<CommentBan?> GetByNameAsync(string name)
+    public async Task<CommentBan?> GetByUserIdAsync(Guid userId)
     {
-        return await DbSet.FirstOrDefaultAsync(b => b.Name == name);
+        return await DbSet.FirstOrDefaultAsync(b => b.UserId == userId);
     }
 }

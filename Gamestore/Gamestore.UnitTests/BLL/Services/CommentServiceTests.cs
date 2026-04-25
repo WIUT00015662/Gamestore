@@ -12,6 +12,7 @@ public class CommentServiceTests
     private readonly Mock<IGameRepository> _gameRepoMock;
     private readonly Mock<ICommentRepository> _commentRepoMock;
     private readonly Mock<ICommentBanRepository> _commentBanRepoMock;
+    private readonly Mock<IUserRepository> _userRepoMock;
     private readonly CommentService _commentService;
 
     public CommentServiceTests()
@@ -19,11 +20,13 @@ public class CommentServiceTests
         _gameRepoMock = new Mock<IGameRepository>();
         _commentRepoMock = new Mock<ICommentRepository>();
         _commentBanRepoMock = new Mock<ICommentBanRepository>();
+        _userRepoMock = new Mock<IUserRepository>();
 
         _unitOfWorkMock = new Mock<IUnitOfWork>();
         _unitOfWorkMock.Setup(x => x.Games).Returns(_gameRepoMock.Object);
         _unitOfWorkMock.Setup(x => x.Comments).Returns(_commentRepoMock.Object);
         _unitOfWorkMock.Setup(x => x.CommentBans).Returns(_commentBanRepoMock.Object);
+        _unitOfWorkMock.Setup(x => x.Users).Returns(_userRepoMock.Object);
         _unitOfWorkMock.Setup(x => x.SaveChangesAsync()).ReturnsAsync(1);
 
         _commentRepoMock.Setup(x => x.AddAsync(It.IsAny<Comment>())).Returns(Task.CompletedTask);
@@ -35,6 +38,7 @@ public class CommentServiceTests
     [Fact]
     public async Task AddCommentAsyncThrowsWhenUserIsBanned()
     {
+        var actorUserId = Guid.NewGuid();
         var game = new Game { Id = Guid.NewGuid(), Name = "Game", Key = "game" };
         var request = new AddCommentRequest
         {
@@ -42,19 +46,21 @@ public class CommentServiceTests
         };
 
         _gameRepoMock.Setup(x => x.GetByKeyAsync("game")).ReturnsAsync(game);
-        _commentBanRepoMock.Setup(x => x.GetByNameAsync("John")).ReturnsAsync(new CommentBan
+        _commentBanRepoMock.Setup(x => x.GetByUserIdAsync(actorUserId)).ReturnsAsync(new CommentBan
         {
             Id = Guid.NewGuid(),
+            UserId = actorUserId,
             Name = "John",
             IsPermanent = true,
         });
 
-        await Assert.ThrowsAsync<ArgumentException>(() => _commentService.AddCommentAsync("game", request));
+        await Assert.ThrowsAsync<ArgumentException>(() => _commentService.AddCommentAsync("game", request, actorUserId, "John"));
     }
 
     [Fact]
     public async Task AddCommentAsyncFormatsReplyBody()
     {
+        var actorUserId = Guid.NewGuid();
         var game = new Game { Id = Guid.NewGuid(), Name = "Game", Key = "game" };
         var parentComment = new Comment
         {
@@ -72,7 +78,7 @@ public class CommentServiceTests
         };
 
         _gameRepoMock.Setup(x => x.GetByKeyAsync("game")).ReturnsAsync(game);
-        _commentBanRepoMock.Setup(x => x.GetByNameAsync("John")).ReturnsAsync((CommentBan?)null);
+        _commentBanRepoMock.Setup(x => x.GetByUserIdAsync(actorUserId)).ReturnsAsync((CommentBan?)null);
         _commentRepoMock.Setup(x => x.GetByIdWithDetailsAsync(parentComment.Id)).ReturnsAsync(parentComment);
 
         Comment? addedComment = null;
@@ -81,9 +87,10 @@ public class CommentServiceTests
             .Callback<Comment>(c => addedComment = c)
             .Returns(Task.CompletedTask);
 
-        await _commentService.AddCommentAsync("game", request);
+        await _commentService.AddCommentAsync("game", request, actorUserId, "John");
 
         Assert.NotNull(addedComment);
+        Assert.Equal(actorUserId, addedComment.AuthorUserId);
         Assert.Equal("John", addedComment.Name);
         Assert.Equal("ParentUser, Reply text", addedComment.Body);
         Assert.Equal(parentComment.Id, addedComment.ParentCommentId);
@@ -131,7 +138,7 @@ public class CommentServiceTests
         _commentRepoMock.Setup(x => x.GetByIdWithDetailsAsync(commentId)).ReturnsAsync(comment);
         _commentRepoMock.Setup(x => x.GetQuotedByCommentIdAsync(commentId)).ReturnsAsync([quotingComment]);
 
-        await _commentService.DeleteCommentAsync("game", commentId, "A", false);
+        await _commentService.DeleteCommentAsync("game", commentId, Guid.NewGuid(), "A", false);
 
         Assert.Equal("A comment/quote was deleted", comment.Body);
         Assert.Equal("A comment/quote was deleted, my quote text", quotingComment.Body);
@@ -143,17 +150,24 @@ public class CommentServiceTests
     {
         var result = _commentService.GetBanDurations().ToList();
 
-        Assert.Contains("1 hour", result);
-        Assert.Contains("1 day", result);
-        Assert.Contains("1 week", result);
-        Assert.Contains("1 month", result);
-        Assert.Contains("permanent", result);
+        Assert.Contains(BanDurationType.OneHour, result);
+        Assert.Contains(BanDurationType.OneDay, result);
+        Assert.Contains(BanDurationType.OneWeek, result);
+        Assert.Contains(BanDurationType.OneMonth, result);
+        Assert.Contains(BanDurationType.Permanent, result);
     }
 
     [Fact]
     public async Task BanUserAsyncCreatesPermanentBan()
     {
-        _commentBanRepoMock.Setup(x => x.GetByNameAsync("John")).ReturnsAsync((CommentBan?)null);
+        var userId = Guid.NewGuid();
+        _commentBanRepoMock.Setup(x => x.GetByUserIdAsync(userId)).ReturnsAsync((CommentBan?)null);
+        _userRepoMock.Setup(x => x.GetByIdAsync(userId)).ReturnsAsync(new User
+        {
+            Id = userId,
+            Name = "John",
+            PasswordHash = "hash",
+        });
 
         CommentBan? addedBan = null;
         _commentBanRepoMock
@@ -164,11 +178,12 @@ public class CommentServiceTests
         await _commentService.BanUserAsync(
             new BanUserRequest
             {
-                User = "John",
-                Duration = "permanent",
+                UserId = userId,
+                Duration = BanDurationType.Permanent,
             });
 
         Assert.NotNull(addedBan);
+        Assert.Equal(userId, addedBan.UserId);
         Assert.Equal("John", addedBan.Name);
         Assert.True(addedBan.IsPermanent);
         Assert.Null(addedBan.BannedUntil);

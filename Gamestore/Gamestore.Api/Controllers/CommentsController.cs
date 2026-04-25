@@ -24,7 +24,7 @@ public class CommentsController(ICommentService commentService) : ControllerBase
     [HttpGet("users/search")]
     public async Task<IActionResult> SearchUsers([FromQuery] string query = "", [FromQuery] int take = 20)
     {
-        var users = await _commentService.SearchUserNamesAsync(query, take);
+        var users = await _commentService.SearchUsersAsync(query, take);
         return Ok(users);
     }
 

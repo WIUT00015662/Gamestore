@@ -10,9 +10,15 @@ internal sealed class CommentBanConfiguration : IEntityTypeConfiguration<Comment
     {
         builder.HasKey(b => b.Id);
 
+        builder.Property(b => b.UserId).IsRequired();
         builder.Property(b => b.Name).IsRequired();
         builder.Property(b => b.IsPermanent).IsRequired();
 
-        builder.HasIndex(b => b.Name).IsUnique();
+        builder.HasOne(b => b.User)
+            .WithMany(u => u.CommentBans)
+            .HasForeignKey(b => b.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasIndex(b => b.UserId).IsUnique();
     }
 }

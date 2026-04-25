@@ -1,4 +1,4 @@
-import { clearToken, getToken, saveToken } from '../auth';
+import { clearToken, getToken } from '../auth';
 import type {
   BasicRole,
   BasicUser,
@@ -10,65 +10,33 @@ import type {
   GameFilters,
   Genre,
   GetGamesResponse,
-  IBoxPaymentResponse,
   LoginRequest,
   Offer,
   Order,
   PaymentMethodsResponse,
   Platform,
   Publisher,
-  RefreshTokenRequest,
+  BanDurationType,
   RegisterRequest,
   TokenResponse,
+  UserLookup,
 } from '../types';
 
 const apiBase = import.meta.env.VITE_API_BASE_URL ?? 'https://localhost:7091';
 
-async function refreshTokenIfPossible(): Promise<boolean> {
-  const token = getToken();
-  if (!token) {
-    return false;
-  }
-
-  try {
-    const response = await fetch(`${apiBase}/users/refresh`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ token } satisfies RefreshTokenRequest),
-    });
-
-    if (!response.ok) {
-      clearToken();
-      return false;
-    }
-
-    const data = (await response.json()) as TokenResponse;
-    saveToken(data.token);
-    return true;
-  } catch {
-    clearToken();
-    return false;
-  }
-}
-
-async function request<T>(url: string, init?: RequestInit, retryOnUnauthorized = true): Promise<T> {
+async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const token = getToken();
   const response = await fetch(`${apiBase}${url}`, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(init?.headers ?? {}),
+      ...(init?.headers),
     },
   });
 
-  if (response.status === 401 && retryOnUnauthorized) {
-    const refreshed = await refreshTokenIfPossible();
-    if (refreshed) {
-      return request<T>(url, init, false);
-    }
+  if (response.status === 401) {
+    clearToken();
   }
 
   if (!response.ok) {
@@ -101,7 +69,8 @@ export const api = {
   getGames: (name = '', page = 1) => request<GetGamesResponse>(`/games?name=${encodeURIComponent(name)}&page=${page}&pageCount=10`),
   getGamesFiltered: (filters: GameFilters) => {
     const query = toGameQuery(filters);
-    return request<GetGamesResponse>(`/games${query ? `?${query}` : ''}`);
+    const suffix = query ? `?${query}` : '';
+    return request<GetGamesResponse>(`/games${suffix}`);
   },
   getPaginationOptions: () => request<string[]>('/games/pagination-options'),
   getSortingOptions: () => request<string[]>('/games/sorting-options'),
@@ -150,12 +119,12 @@ export const api = {
       }
 
       const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
+      const url = globalThis.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       link.download = 'invoice.pdf';
       link.click();
-      window.URL.revokeObjectURL(url);
+      globalThis.URL.revokeObjectURL(url);
       return;
     }
 
@@ -165,7 +134,7 @@ export const api = {
   getMyOrderById: (id: string) => request<Order>(`/orders/my-orders/${id}`),
   getMyOrderDetails: (id: string) => request<CartItem[]>(`/orders/my-orders/${id}/details`),
   getUsers: () => request<BasicUser[]>('/users'),
-  searchUsers: (query: string, take = 20) => request<string[]>(`/comments/users/search?query=${encodeURIComponent(query)}&take=${take}`),
+  searchUsers: (query: string, take = 20) => request<UserLookup[]>(`/comments/users/search?query=${encodeURIComponent(query)}&take=${take}`),
   getUserRoles: (id: string) => request<BasicRole[]>(`/users/${id}/roles`),
   createUser: (payload: { user: { id: string; name: string }; roles: string[]; password: string }) =>
     request<BasicUser>('/users', {
@@ -194,11 +163,11 @@ export const api = {
     }),
   deleteRole: (id: string) => request<void>(`/roles/${id}`, { method: 'DELETE' }),
 
-  getBanDurations: () => request<string[]>('/comments/ban/durations'),
-  banUser: (user: string, duration: string) =>
+  getBanDurations: () => request<BanDurationType[]>('/comments/ban/durations'),
+  banUser: (userId: string, duration: BanDurationType) =>
     request<void>('/comments/ban', {
       method: 'POST',
-      body: JSON.stringify({ user, duration }),
+      body: JSON.stringify({ userId, duration }),
     }),
   getGamesByGenreId: (id: string) => request<Game[]>(`/genres/${id}/games`),
   getGamesByPlatformId: (id: string) => request<Game[]>(`/platforms/${id}/games`),

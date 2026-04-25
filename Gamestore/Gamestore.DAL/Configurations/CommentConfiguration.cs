@@ -15,6 +15,11 @@ internal sealed class CommentConfiguration : IEntityTypeConfiguration<Comment>
         builder.Property(c => c.GameId).IsRequired();
         builder.Property(c => c.IsDeleted).IsRequired();
 
+        builder.HasOne(c => c.AuthorUser)
+            .WithMany(u => u.Comments)
+            .HasForeignKey(c => c.AuthorUserId)
+            .OnDelete(DeleteBehavior.SetNull);
+
         builder.HasOne(c => c.Game)
             .WithMany(g => g.Comments)
             .HasForeignKey(c => c.GameId)

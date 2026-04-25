@@ -9,4 +9,8 @@ public class User
     public required string PasswordHash { get; set; }
 
     public ICollection<UserRole> UserRoles { get; set; } = [];
+
+    public ICollection<Comment> Comments { get; set; } = [];
+
+    public ICollection<CommentBan> CommentBans { get; set; } = [];
 }

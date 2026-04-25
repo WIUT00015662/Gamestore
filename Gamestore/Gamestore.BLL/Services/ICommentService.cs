@@ -4,17 +4,17 @@ namespace Gamestore.BLL.Services;
 
 public interface ICommentService
 {
-    Task AddCommentAsync(string gameKey, AddCommentRequest request);
+    Task AddCommentAsync(string gameKey, AddCommentRequest request, Guid actorUserId, string actorName);
 
     Task<IEnumerable<CommentResponse>> GetCommentsByGameKeyAsync(string gameKey);
 
-    Task UpdateCommentAsync(string gameKey, Guid commentId, UpdateCommentRequest request, string actorName);
+    Task UpdateCommentAsync(string gameKey, Guid commentId, UpdateCommentRequest request, Guid actorUserId, string actorName);
 
-    Task DeleteCommentAsync(string gameKey, Guid commentId, string actorName, bool canManageComments);
+    Task DeleteCommentAsync(string gameKey, Guid commentId, Guid actorUserId, string actorName, bool canManageComments);
 
-    IEnumerable<string> GetBanDurations();
+    IEnumerable<BanDurationType> GetBanDurations();
 
     Task BanUserAsync(BanUserRequest request);
 
-    Task<IEnumerable<string>> SearchUserNamesAsync(string query, int take);
+    Task<IEnumerable<UserLookupResponse>> SearchUsersAsync(string query, int take);
 }

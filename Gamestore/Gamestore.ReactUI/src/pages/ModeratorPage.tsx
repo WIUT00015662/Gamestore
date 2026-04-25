@@ -1,12 +1,22 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
+import type { BanDurationType, UserLookup } from '../types';
+
+const durationLabels: Record<BanDurationType, string> = {
+  OneHour: '1 hour',
+  OneDay: '1 day',
+  OneWeek: '1 week',
+  OneMonth: '1 month',
+  Permanent: 'permanent',
+};
 
 export function ModeratorPage() {
-  const [durations, setDurations] = useState<string[]>([]);
+  const [durations, setDurations] = useState<BanDurationType[]>([]);
   const [query, setQuery] = useState('');
-  const [matches, setMatches] = useState<string[]>([]);
-  const [user, setUser] = useState('');
-  const [duration, setDuration] = useState('permanent');
+  const [matches, setMatches] = useState<UserLookup[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState('');
+  const [selectedUserName, setSelectedUserName] = useState('');
+  const [duration, setDuration] = useState<BanDurationType>('Permanent');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
@@ -45,8 +55,8 @@ export function ModeratorPage() {
 
   const ban = async () => {
     try {
-      await api.banUser(user, duration);
-      setMessage(`User ${user} banned for ${duration}.`);
+      await api.banUser(selectedUserId, duration);
+      setMessage(`User ${selectedUserName} banned for ${durationLabels[duration]}.`);
       setError('');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ban operation failed');
@@ -61,7 +71,7 @@ export function ModeratorPage() {
       <div className="form-wrap">
         <div className="form">
           <label>
-            Search user name
+            <span>Search user name</span>
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -71,22 +81,42 @@ export function ModeratorPage() {
           {matches.length > 0 ? (
             <ul className="list compact search-results">
               {matches.map((match) => (
-                <li key={match}>
-                  <button type="button" className="btn-small" onClick={() => setUser(match)}>{match}</button>
+                <li key={match.id}>
+                  <button
+                    type="button"
+                    className="btn-small"
+                    onClick={() => {
+                      setSelectedUserId(match.id);
+                      setSelectedUserName(match.name);
+                    }}>
+                    {match.name} ({match.id})
+                  </button>
                 </li>
               ))}
             </ul>
           ) : null}
           <label>
-            Selected user
-            <input value={user} onChange={(e) => setUser(e.target.value)} placeholder="User name" />
+            <span>Selected user name</span>
+            <input
+              value={selectedUserName}
+              onChange={(e) => setSelectedUserName(e.target.value)}
+              placeholder="User name"
+            />
           </label>
           <label>
-            Duration
-            <select value={duration} onChange={(e) => setDuration(e.target.value)}>
+            <span>Selected user id</span>
+            <input
+              value={selectedUserId}
+              onChange={(e) => setSelectedUserId(e.target.value)}
+              placeholder="User id"
+            />
+          </label>
+          <label>
+            <span>Duration</span>
+            <select value={duration} onChange={(e) => setDuration(e.target.value as BanDurationType)}>
               {durations.map((item) => (
                 <option key={item} value={item}>
-                  {item}
+                  {durationLabels[item]}
                 </option>
               ))}
             </select>

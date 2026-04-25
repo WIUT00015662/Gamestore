@@ -2,7 +2,7 @@ namespace Gamestore.BLL.DTOs.Comment;
 
 public class BanUserRequest
 {
-    public required string User { get; set; }
+    public Guid UserId { get; set; }
 
-    public required string Duration { get; set; }
+    public BanDurationType? Duration { get; set; }
 }

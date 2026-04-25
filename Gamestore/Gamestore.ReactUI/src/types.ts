@@ -53,11 +53,19 @@ export type Offer = {
 
 export type Comment = {
   id: string;
+  authorUserId?: string;
   name: string;
   body: string;
   isDeleted?: boolean;
   childComments: Comment[];
 };
+
+export type UserLookup = {
+  id: string;
+  name: string;
+};
+
+export type BanDurationType = 'OneHour' | 'OneDay' | 'OneWeek' | 'OneMonth' | 'Permanent';
 
 export type CartItem = {
   productId: string;
@@ -129,10 +137,6 @@ export type RegisterRequest = {
   userName: string;
   email: string;
   password: string;
-};
-
-export type RefreshTokenRequest = {
-  token: string;
 };
 
 export type GameFilters = {
