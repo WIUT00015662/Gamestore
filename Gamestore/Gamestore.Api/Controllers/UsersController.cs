@@ -27,14 +27,6 @@ public class UsersController(IAuthManagementService authManagementService) : Con
         return Ok(token);
     }
 
-    [AllowAnonymous]
-    [HttpPost("refresh")]
-    public async Task<IActionResult> Refresh([FromBody] RefreshTokenRequest request)
-    {
-        var token = await _authManagementService.RefreshTokenAsync(request);
-        return Ok(token);
-    }
-
     [Authorize]
     [HttpPost("access")]
     public async Task<IActionResult> CheckAccess([FromBody] AccessRequest request)

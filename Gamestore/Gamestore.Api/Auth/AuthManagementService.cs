@@ -77,30 +77,6 @@ public class AuthManagementService(IUnitOfWork unitOfWork, JwtSettings jwtSettin
         return new TokenResponse { Token = CreateToken(user, [userRole.Name], permissions) };
     }
 
-    public async Task<TokenResponse> RefreshTokenAsync(RefreshTokenRequest request)
-    {
-        var principal = ValidateExpiredToken(request.Token);
-        var userName = principal.Identity?.Name
-            ?? principal.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Name)?.Value
-            ?? throw new ArgumentException("Invalid token.");
-
-        var user = await _unitOfWork.Users.GetByNameAsync(userName)
-            ?? throw new ArgumentException("User no longer exists.");
-
-        var roles = user.UserRoles
-            .Where(ur => ur.Role is not null)
-            .Select(ur => ur.Role)
-            .OfType<Role>()
-            .ToList();
-
-        var permissions = roles
-            .SelectMany(r => r.Permissions.Select(p => p.Permission))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
-        return new TokenResponse { Token = CreateToken(user, roles.Select(r => r.Name), permissions) };
-    }
-
     public async Task<bool> CheckAccessAsync(ClaimsPrincipal principal, AccessRequest request)
     {
         var permission = request.TargetPage.Trim().ToLowerInvariant() switch
@@ -424,28 +400,4 @@ public class AuthManagementService(IUnitOfWork unitOfWork, JwtSettings jwtSettin
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
-    private ClaimsPrincipal ValidateExpiredToken(string token)
-    {
-        var tokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateAudience = true,
-            ValidateIssuer = true,
-            ValidateIssuerSigningKey = true,
-            ValidateLifetime = false,
-            ValidIssuer = _jwtSettings.Issuer,
-            ValidAudience = _jwtSettings.Audience,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.Key)),
-        };
-
-        var tokenHandler = new JwtSecurityTokenHandler();
-        var principal = tokenHandler.ValidateToken(token, tokenValidationParameters, out var securityToken);
-
-        if (securityToken is not JwtSecurityToken jwtToken ||
-            !jwtToken.Header.Alg.Equals(SecurityAlgorithms.HmacSha256, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new SecurityTokenException("Invalid token.");
-        }
-
-        return principal;
-    }
 }
