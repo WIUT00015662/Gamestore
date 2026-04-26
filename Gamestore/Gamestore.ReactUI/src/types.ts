@@ -6,6 +6,12 @@ export enum OrderStatus {
   Shipped = 4,
 }
 
+export enum CommentActionType {
+  None = 0,
+  Reply = 1,
+  Quote = 2,
+}
+
 export type LoginRequest = {
   model: {
     login: string;
