@@ -10,5 +10,5 @@ public class AddCommentRequest
     [JsonConverter(typeof(NullableGuidEmptyStringJsonConverter))]
     public Guid? ParentId { get; set; }
 
-    public string? Action { get; set; }
+    public CommentActionType Action { get; set; } = CommentActionType.None;
 }

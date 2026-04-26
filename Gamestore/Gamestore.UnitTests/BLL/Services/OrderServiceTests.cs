@@ -3,6 +3,7 @@ using Gamestore.BLL.Services;
 using Gamestore.Domain.Entities;
 using Gamestore.Domain.Exceptions;
 using Gamestore.Domain.Repositories;
+using Microsoft.Extensions.Options;
 using Moq;
 
 namespace GameStore.UnitTests.BLL.Services;
@@ -14,6 +15,7 @@ public class OrderServiceTests
     private readonly Mock<IOrderRepository> _orderRepoMock;
     private readonly Mock<IPaymentGatewayClient> _paymentGatewayClientMock;
     private readonly OrderSettings _orderSettings;
+    private readonly IOptions<PaymentMethodsConfig> _paymentMethodsOptions;
     private readonly OrderService _orderService;
     private readonly Guid _testUserId = Guid.NewGuid();
 
@@ -36,7 +38,10 @@ public class OrderServiceTests
             PaymentRetryCount = 3,
         };
 
-        _orderService = new OrderService(_unitOfWorkMock.Object, _paymentGatewayClientMock.Object, _orderSettings);
+        var paymentMethodsConfig = new PaymentMethodsConfig();
+        _paymentMethodsOptions = Options.Create(paymentMethodsConfig);
+
+        _orderService = new OrderService(_unitOfWorkMock.Object, _paymentGatewayClientMock.Object, _orderSettings, _paymentMethodsOptions);
     }
 
     [Fact]
@@ -99,7 +104,7 @@ public class OrderServiceTests
             ],
         };
 
-        _orderRepoMock.Setup(r => r.GetOpenOrderByCustomerIdAsync(_testUserId)).ReturnsAsync(order);
+        _orderRepoMock.Setup(r => r.GetByStatusesAsync(It.IsAny<OrderStatus[]>())).ReturnsAsync([order]);
 
         await _orderService.RemoveGameFromCartAsync(game.Key, _testUserId);
 

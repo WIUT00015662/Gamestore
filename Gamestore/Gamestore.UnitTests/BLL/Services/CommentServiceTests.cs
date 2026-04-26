@@ -74,7 +74,7 @@ public class CommentServiceTests
         {
             Comment = new CommentBodyDto { Name = "John", Body = "Reply text" },
             ParentId = parentComment.Id,
-            Action = "reply",
+            Action = CommentActionType.Reply,
         };
 
         _gameRepoMock.Setup(x => x.GetByKeyAsync("game")).ReturnsAsync(game);
@@ -92,7 +92,7 @@ public class CommentServiceTests
         Assert.NotNull(addedComment);
         Assert.Equal(actorUserId, addedComment.AuthorUserId);
         Assert.Equal("John", addedComment.Name);
-        Assert.Equal("ParentUser, Reply text", addedComment.Body);
+        Assert.Equal("Reply text", addedComment.Body);
         Assert.Equal(parentComment.Id, addedComment.ParentCommentId);
         Assert.Null(addedComment.QuotedCommentId);
     }
@@ -129,7 +129,7 @@ public class CommentServiceTests
         {
             Id = Guid.NewGuid(),
             Name = "B",
-            Body = "Original, my quote text",
+            Body = "my quote text",
             GameId = game.Id,
             QuotedCommentId = commentId,
         };
@@ -140,8 +140,8 @@ public class CommentServiceTests
 
         await _commentService.DeleteCommentAsync("game", commentId, Guid.NewGuid(), "A", false);
 
-        Assert.Equal("A comment/quote was deleted", comment.Body);
-        Assert.Equal("A comment/quote was deleted, my quote text", quotingComment.Body);
+        Assert.True(comment.IsDeleted);
+        Assert.Equal("Original", comment.Body);
         _unitOfWorkMock.Verify(x => x.SaveChangesAsync(), Times.Once);
     }
 

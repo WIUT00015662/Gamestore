@@ -3,6 +3,7 @@ using Gamestore.BLL.Mapping;
 using Gamestore.Domain.Entities;
 using Gamestore.Domain.Exceptions;
 using Gamestore.Domain.Repositories;
+using Microsoft.Extensions.Options;
 using QuestPDF.Fluent;
 
 namespace Gamestore.BLL.Services;
@@ -10,11 +11,13 @@ namespace Gamestore.BLL.Services;
 public class OrderService(
     IUnitOfWork unitOfWork,
     IPaymentGatewayClient paymentGatewayClient,
-    OrderSettings orderSettings) : IOrderService
+    OrderSettings orderSettings,
+    IOptions<PaymentMethodsConfig> paymentMethodsOptions) : IOrderService
 {
     private readonly IUnitOfWork _unitOfWork = unitOfWork;
     private readonly IPaymentGatewayClient _paymentGatewayClient = paymentGatewayClient;
     private readonly OrderSettings _orderSettings = orderSettings;
+    private readonly PaymentMethodsConfig _paymentMethodsConfig = paymentMethodsOptions.Value;
 
     public async Task AddGameToCartAsync(string gameKey, Guid userId)
     {
@@ -199,21 +202,14 @@ public class OrderService(
     {
         return new PaymentMethodsResponse
         {
-            PaymentMethods =
-            [
-                new PaymentMethodResponse
+            PaymentMethods = _paymentMethodsConfig.Methods
+                .Select(m => new PaymentMethodResponse
                 {
-                    ImageUrl = "https://upload.wikimedia.org/wikipedia/commons/thumb/4/41/LINE_logo.svg/960px-LINE_logo.svg.png?_=20220419085336",
-                    Title = "Bank",
-                    Description = "Pay via generated bank invoice.",
-                },
-                new PaymentMethodResponse
-                {
-                    ImageUrl = "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5c/Visa_Inc._logo_%282021%E2%80%93present%29.svg/1280px-Visa_Inc._logo_%282021%E2%80%93present%29.svg.png",
-                    Title = "Visa",
-                    Description = "Pay using your Visa card.",
-                },
-            ],
+                    ImageUrl = m.ImageUrl,
+                    Title = m.Title,
+                    Description = m.Description,
+                })
+                .ToList(),
         };
     }
 

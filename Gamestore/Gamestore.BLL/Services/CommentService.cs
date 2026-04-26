@@ -7,9 +7,7 @@ namespace Gamestore.BLL.Services;
 
 public class CommentService(IUnitOfWork unitOfWork) : ICommentService
 {
-    private const string DeletedMessage = "A comment/quote was deleted";
-
-    private static readonly IReadOnlyDictionary<BanDurationType, TimeSpan?> BanDurations = new Dictionary<BanDurationType, TimeSpan?>
+    private static readonly Dictionary<BanDurationType, TimeSpan?> BanDurations = new()
     {
         [BanDurationType.OneHour] = TimeSpan.FromHours(1),
         [BanDurationType.OneDay] = TimeSpan.FromDays(1),
@@ -30,42 +28,28 @@ public class CommentService(IUnitOfWork unitOfWork) : ICommentService
             throw new ArgumentException("User is banned from commenting.");
         }
 
-        var action = request.Action?.Trim();
-        string finalBody;
-        Guid? quotedCommentId = null;
-
-        if (request.ParentId is null)
+        if (request.Action != CommentActionType.None && request.ParentId is null)
         {
-            if (!string.IsNullOrWhiteSpace(action))
-            {
-                throw new ArgumentException("Action requires parent comment.");
-            }
-
-            finalBody = request.Comment.Body;
+            throw new ArgumentException("Action requires parent comment.");
         }
-        else
+
+        var parent = request.ParentId.HasValue
+            ? await _unitOfWork.Comments.GetByIdWithDetailsAsync(request.ParentId.Value)
+            : null;
+
+        if (parent is not null && parent.GameId != game.Id)
         {
-            var parent = await _unitOfWork.Comments.GetByIdWithDetailsAsync(request.ParentId.Value)
-                ?? throw new EntityNotFoundException(nameof(Comment), request.ParentId.Value);
-
-            if (parent.GameId != game.Id)
-            {
-                throw new ArgumentException("Parent comment does not belong to the specified game.");
-            }
-
-            finalBody = BuildCommentBody(parent, request.Comment.Body, action);
-            if (string.Equals(action, "quote", StringComparison.OrdinalIgnoreCase))
-            {
-                quotedCommentId = parent.Id;
-            }
+            throw new ArgumentException("Parent comment does not belong to the specified game.");
         }
+
+        var quotedCommentId = request.Action == CommentActionType.Quote ? request.ParentId : null;
 
         var comment = new Comment
         {
             Id = Guid.NewGuid(),
             AuthorUserId = actorUserId,
             Name = actorName,
-            Body = finalBody,
+            Body = request.Comment.Body,
             ParentCommentId = request.ParentId,
             QuotedCommentId = quotedCommentId,
             GameId = game.Id,
@@ -132,11 +116,8 @@ public class CommentService(IUnitOfWork unitOfWork) : ICommentService
             throw new ArgumentException("Deleted comments cannot be edited.");
         }
 
-        var oldBody = comment.Body;
         comment.Body = request.Comment.Body;
         _unitOfWork.Comments.Update(comment);
-
-        await RefreshQuotedCascadeAsync(comment.Id, oldBody, comment.Body);
         await _unitOfWork.SaveChangesAsync();
     }
 
@@ -167,12 +148,8 @@ public class CommentService(IUnitOfWork unitOfWork) : ICommentService
             return;
         }
 
-        var oldBody = comment.Body;
-        comment.Body = DeletedMessage;
         comment.IsDeleted = true;
         _unitOfWork.Comments.Update(comment);
-
-        await RefreshQuotedCascadeAsync(comment.Id, oldBody, comment.Body);
         await _unitOfWork.SaveChangesAsync();
     }
 
@@ -246,47 +223,5 @@ public class CommentService(IUnitOfWork unitOfWork) : ICommentService
             && (ban.IsPermanent || (ban.BannedUntil is { } bannedUntil && bannedUntil > DateTime.UtcNow));
     }
 
-    private static string BuildCommentBody(Comment parent, string userBody, string? action)
-    {
-        return action?.Trim().ToLowerInvariant() switch
-        {
-            null or "" => userBody,
-            "reply" => $"{parent.Name}, {userBody}",
-            "quote" => $"{parent.Body}, {userBody}",
-            _ => throw new ArgumentException($"Unsupported action: {action}"),
-        };
-    }
 
-    private async Task RefreshQuotedCascadeAsync(Guid sourceCommentId, string oldPrefix, string newPrefix)
-    {
-        var quotedComments = (await _unitOfWork.Comments.GetQuotedByCommentIdAsync(sourceCommentId)).ToList();
-        foreach (var quotedComment in quotedComments)
-        {
-            var oldQuotedBody = quotedComment.Body;
-            var suffix = ExtractSuffix(quotedComment.Body, oldPrefix);
-            quotedComment.Body = string.IsNullOrWhiteSpace(suffix)
-                ? newPrefix
-                : $"{newPrefix}, {suffix}";
-            _unitOfWork.Comments.Update(quotedComment);
-
-            await RefreshQuotedCascadeAsync(quotedComment.Id, oldQuotedBody, quotedComment.Body);
-        }
-    }
-
-    private static string ExtractSuffix(string body, string expectedPrefix)
-    {
-        var prefixWithSeparator = $"{expectedPrefix}, ";
-        if (body.StartsWith(prefixWithSeparator, StringComparison.Ordinal))
-        {
-            return body[prefixWithSeparator.Length..].Trim();
-        }
-
-        if (body.Equals(expectedPrefix, StringComparison.Ordinal))
-        {
-            return string.Empty;
-        }
-
-        var commaIndex = body.IndexOf(',');
-        return commaIndex < 0 ? string.Empty : body[(commaIndex + 1)..].Trim();
-    }
 }

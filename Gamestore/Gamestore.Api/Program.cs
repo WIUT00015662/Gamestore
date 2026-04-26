@@ -47,7 +47,8 @@ builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddScoped<ICommentService, CommentService>();
 builder.Services.AddScoped<IGameDealsService, GameDealsService>();
 builder.Services.AddScoped<IDiscountSimulationService, DiscountSimulationService>();
-builder.Services.AddScoped<IDiscountNotificationService, LoggingDiscountNotificationService>();
+builder.Services.AddScoped<IEmailService, SmtpEmailService>();
+builder.Services.AddScoped<IDiscountNotificationService, EmailDiscountNotificationService>();
 
 builder.Services.AddScoped<IAuthManagementService, AuthManagementService>();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
@@ -82,6 +83,10 @@ builder.Services.AddAuthorization(options =>
 });
 
 builder.Services.AddSingleton(builder.Configuration.GetSection("OrderSettings").Get<OrderSettings>() ?? new OrderSettings());
+builder.Services.AddOptions<PaymentMethodsConfig>()
+    .Bind(builder.Configuration.GetSection(PaymentMethodsConfig.SectionName));
+builder.Services.AddOptions<SmtpSettings>()
+    .Bind(builder.Configuration.GetSection(SmtpSettings.SectionName));
 builder.Services.AddSingleton(builder.Configuration.GetSection("PaymentGatewaySettings").Get<PaymentGatewaySettings>() ?? new PaymentGatewaySettings());
 builder.Services.AddSingleton(builder.Configuration.GetSection("DiscountPolling").Get<DiscountPollingOptions>() ?? new DiscountPollingOptions());
 builder.Services.AddHostedService<DiscountPollingBackgroundService>();
