@@ -34,10 +34,10 @@ jobs:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Restore backend
-        run: dotnet restore Gamestore/Gamestore.Api/Gamestore.Api.csproj
+        run: dotnet restore Gamestore/Gamestore.sln
 
       - name: Build backend
-        run: dotnet build Gamestore/Gamestore.Api/Gamestore.Api.csproj --configuration Release --no-restore
+        run: dotnet build Gamestore/Gamestore.sln --configuration Release --no-restore
 
       - name: Run unit tests
         run: dotnet test Gamestore/Gamestore.UnitTests/Gamestore.UnitTests.csproj --configuration Release --no-build
