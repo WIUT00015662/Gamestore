@@ -26,5 +26,13 @@ public interface IUnitOfWork : IDisposable
 
     IRepository<GameDiscountSnapshot> GameDiscountSnapshots { get; }
 
+    IEmailSubscriptionRepository EmailSubscriptions { get; }
+
+    IGameDiscountRepository GameDiscounts { get; }
+
+    IDiscountConfigurationRepository DiscountConfigurations { get; }
+
+    IPollingRunRepository PollingRuns { get; }
+
     Task<int> SaveChangesAsync();
 }

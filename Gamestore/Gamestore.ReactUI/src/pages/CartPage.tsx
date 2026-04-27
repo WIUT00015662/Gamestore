@@ -83,22 +83,26 @@ export function CartPage() {
             ))}
           </ul>
 
-          <p>
-            <strong>Total:</strong> ${total.toFixed(2)}
-          </p>
+          {items.length > 0 ? (
+            <>
+              <p>
+                <strong>Total:</strong> ${total.toFixed(2)}
+              </p>
 
-          <div className="toolbar">
-            <select value={selectedMethod} onChange={(e) => setSelectedMethod(e.target.value)}>
-              {methods.map((method) => (
-                <option key={method.title} value={method.title}>
-                  {method.title}
-                </option>
-              ))}
-            </select>
-            <button className="btn" type="button" onClick={() => void pay()} disabled={!canPay}>
-              Pay
-            </button>
-          </div>
+              <div className="toolbar">
+                <select value={selectedMethod} onChange={(e) => setSelectedMethod(e.target.value)}>
+                  {methods.map((method) => (
+                    <option key={method.title} value={method.title}>
+                      {method.title}
+                    </option>
+                  ))}
+                </select>
+                <button className="btn" type="button" onClick={() => void pay()} disabled={!canPay}>
+                  Pay
+                </button>
+              </div>
+            </>
+          ) : null}
         </>
       ) : null}
 

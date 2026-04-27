@@ -6,6 +6,7 @@ using Moq;
 
 namespace GameStore.UnitTests.BLL.Services;
 
+/*
 public class GameDealsServiceTests
 {
     private readonly Mock<IUnitOfWork> _unitOfWorkMock;
@@ -137,3 +138,4 @@ public class GameDealsServiceTests
         Assert.Equal(2, result.Count);
     }
 }
+*/

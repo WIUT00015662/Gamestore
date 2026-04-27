@@ -169,12 +169,30 @@ export function GamesManagementPage() {
         <article className="card">
           <h3>{form.id ? 'Edit game' : 'Create game'}</h3>
           <div className="form">
-            <input value={form.name} onChange={(e: ChangeEvent<HTMLInputElement>) => setForm((old) => ({ ...old, name: e.target.value }))} placeholder="Name" />
-            <input value={form.key} onChange={(e: ChangeEvent<HTMLInputElement>) => setForm((old) => ({ ...old, key: e.target.value }))} placeholder="Key" />
-            <textarea value={form.description} onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setForm((old) => ({ ...old, description: e.target.value }))} placeholder="Description" />
-            <input type="number" value={form.price} onChange={(e: ChangeEvent<HTMLInputElement>) => setForm((old) => ({ ...old, price: Number(e.target.value) }))} placeholder="Price" />
-            <input type="number" value={form.unitInStock} onChange={(e: ChangeEvent<HTMLInputElement>) => setForm((old) => ({ ...old, unitInStock: Number(e.target.value) }))} placeholder="Stock" />
-            <input type="number" value={form.discount} onChange={(e: ChangeEvent<HTMLInputElement>) => setForm((old) => ({ ...old, discount: Number(e.target.value) }))} placeholder="Discount" />
+            <label>
+              Name
+              <input value={form.name} onChange={(e: ChangeEvent<HTMLInputElement>) => setForm((old) => ({ ...old, name: e.target.value }))} placeholder="Name" />
+            </label>
+            <label>
+              Key
+              <input value={form.key} onChange={(e: ChangeEvent<HTMLInputElement>) => setForm((old) => ({ ...old, key: e.target.value }))} placeholder="Key" />
+            </label>
+            <label>
+              Description
+              <textarea value={form.description} onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setForm((old) => ({ ...old, description: e.target.value }))} placeholder="Description" />
+            </label>
+            <label>
+              Price
+              <input type="number" value={form.price} onChange={(e: ChangeEvent<HTMLInputElement>) => setForm((old) => ({ ...old, price: Number(e.target.value) }))} placeholder="Price" />
+            </label>
+            <label>
+              Stock
+              <input type="number" value={form.unitInStock} onChange={(e: ChangeEvent<HTMLInputElement>) => setForm((old) => ({ ...old, unitInStock: Number(e.target.value) }))} placeholder="Stock" />
+            </label>
+            <label>
+              Discount (%)
+              <input type="number" value={form.discount} onChange={(e: ChangeEvent<HTMLInputElement>) => setForm((old) => ({ ...old, discount: Number(e.target.value) }))} placeholder="Discount" />
+            </label>
 
             <select value={form.publisher} onChange={(e: ChangeEvent<HTMLSelectElement>) => setForm((old) => ({ ...old, publisher: e.target.value }))}>
               <option value="">Select publisher</option>

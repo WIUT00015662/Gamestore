@@ -22,6 +22,10 @@ public class UnitOfWork(GamestoreDbContext context) : IUnitOfWork
     private IRoleRepository? _roles;
     private IRepository<GameVendorOffer>? _gameVendorOffers;
     private IRepository<GameDiscountSnapshot>? _gameDiscountSnapshots;
+    private IEmailSubscriptionRepository? _emailSubscriptions;
+    private IGameDiscountRepository? _gameDiscounts;
+    private IDiscountConfigurationRepository? _discountConfigurations;
+    private IPollingRunRepository? _pollingRuns;
 
     /// <inheritdoc/>
     public IGameRepository Games => _games ??= new GameRepository(_context);
@@ -51,6 +55,14 @@ public class UnitOfWork(GamestoreDbContext context) : IUnitOfWork
     public IRepository<GameVendorOffer> GameVendorOffers => _gameVendorOffers ??= new Repository<GameVendorOffer>(_context);
 
     public IRepository<GameDiscountSnapshot> GameDiscountSnapshots => _gameDiscountSnapshots ??= new Repository<GameDiscountSnapshot>(_context);
+
+    public IEmailSubscriptionRepository EmailSubscriptions => _emailSubscriptions ??= new EmailSubscriptionRepository(_context);
+
+    public IGameDiscountRepository GameDiscounts => _gameDiscounts ??= new GameDiscountRepository(_context);
+
+    public IDiscountConfigurationRepository DiscountConfigurations => _discountConfigurations ??= new DiscountConfigurationRepository(_context);
+
+    public IPollingRunRepository PollingRuns => _pollingRuns ??= new PollingRunRepository(_context);
 
     /// <inheritdoc/>
     public async Task<int> SaveChangesAsync()

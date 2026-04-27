@@ -88,6 +88,7 @@ export function OrdersManagementPage() {
       <div className="card-grid">
         <article className="card">
           <h3>Orders</h3>
+          {orders.length === 0 ? <p className="muted">No orders found yet.</p> : null}
           <ul className="list compact">
             {orders.map((order: Order) => (
               <li key={order.id}>
@@ -106,14 +107,16 @@ export function OrdersManagementPage() {
 
         <article className="card">
           <h3>Order details</h3>
-          {!selectedOrderId ? <p className="muted">Select an order.</p> : <p className="muted">{selectedOrderId}</p>}
+          {!selectedOrderId ? <p className="muted">Select an order to manage its items.</p> : <p className="muted">Order: {selectedOrderId}</p>}
+          <p className="muted">Add a game to the selected order by entering its game key.</p>
           <div className="form">
             <input
               value={newGameKey}
               onChange={(e: ChangeEvent<HTMLInputElement>) => setNewGameKey(e.target.value)}
-              placeholder="Game key"
+              placeholder="Game key to add"
+              disabled={!selectedOrderId}
             />
-            <button type="button" className="btn" onClick={() => void addGame()}>
+            <button type="button" className="btn" onClick={() => void addGame()} disabled={!selectedOrderId || !newGameKey.trim()}>
               Add game
             </button>
           </div>

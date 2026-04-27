@@ -4,6 +4,7 @@ using Gamestore.DAL.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Gamestore.DAL.Migrations
 {
     [DbContext(typeof(GamestoreDbContext))]
-    partial class GamestoreDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260426235133_AddEmailSubscription")]
+    partial class AddEmailSubscription
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -89,39 +92,6 @@ namespace Gamestore.DAL.Migrations
                         .IsUnique();
 
                     b.ToTable("CommentBans");
-                });
-
-            modelBuilder.Entity("Gamestore.Domain.Entities.DiscountConfiguration", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<decimal>("DiscountPercentageMax")
-                        .HasPrecision(5, 2)
-                        .HasColumnType("decimal(5,2)");
-
-                    b.Property<decimal>("DiscountPercentageMin")
-                        .HasPrecision(5, 2)
-                        .HasColumnType("decimal(5,2)");
-
-                    b.Property<decimal>("DiscountProbability")
-                        .HasPrecision(5, 4)
-                        .HasColumnType("decimal(5,4)");
-
-                    b.Property<decimal>("DiscountRevertProbability")
-                        .HasPrecision(5, 4)
-                        .HasColumnType("decimal(5,4)");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
-
-                    b.Property<int>("TimeWindowMinutes")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("DiscountConfigurations");
                 });
 
             modelBuilder.Entity("Gamestore.Domain.Entities.EmailSubscription", b =>
@@ -205,35 +175,6 @@ namespace Gamestore.DAL.Migrations
                     b.ToTable("Games");
                 });
 
-            modelBuilder.Entity("Gamestore.Domain.Entities.GameDiscount", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<decimal>("DiscountPercent")
-                        .HasPrecision(5, 2)
-                        .HasColumnType("decimal(5,2)");
-
-                    b.Property<Guid>("GameVendorOfferId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<bool>("IsCurrentlyActive")
-                        .HasColumnType("bit");
-
-                    b.Property<DateTime?>("RevertedAt")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("GameVendorOfferId");
-
-                    b.ToTable("GameDiscounts");
-                });
-
             modelBuilder.Entity("Gamestore.Domain.Entities.GameDiscountSnapshot", b =>
                 {
                     b.Property<Guid>("Id")
@@ -256,9 +197,6 @@ namespace Gamestore.DAL.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<bool>("IsFeatured")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("IsNewDiscount")
                         .HasColumnType("bit");
 
                     b.Property<decimal>("OriginalPrice")
@@ -326,10 +264,6 @@ namespace Gamestore.DAL.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<decimal>("CurrentPrice")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
-
                     b.Property<Guid>("GameId")
                         .HasColumnType("uniqueidentifier");
 
@@ -351,10 +285,6 @@ namespace Gamestore.DAL.Migrations
                     b.Property<string>("PurchaseUrl")
                         .IsRequired()
                         .HasColumnType("nvarchar(450)");
-
-                    b.Property<decimal>("TruePrice")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
 
                     b.Property<string>("Vendor")
                         .IsRequired()
@@ -562,42 +492,6 @@ namespace Gamestore.DAL.Migrations
                         });
                 });
 
-            modelBuilder.Entity("Gamestore.Domain.Entities.PollingRun", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime?>("CompletedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("DiscountsReverted")
-                        .HasColumnType("int");
-
-                    b.Property<string>("ErrorMessage")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("NewDiscountsCreated")
-                        .HasColumnType("int");
-
-                    b.Property<int>("ProcessedOffersCount")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("RunAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("RunAt")
-                        .IsDescending();
-
-                    b.ToTable("PollingRuns");
-                });
-
             modelBuilder.Entity("Gamestore.Domain.Entities.Publisher", b =>
                 {
                     b.Property<Guid>("Id")
@@ -661,9 +555,6 @@ namespace Gamestore.DAL.Migrations
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("Email")
-                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -748,17 +639,6 @@ namespace Gamestore.DAL.Migrations
                         .IsRequired();
 
                     b.Navigation("Publisher");
-                });
-
-            modelBuilder.Entity("Gamestore.Domain.Entities.GameDiscount", b =>
-                {
-                    b.HasOne("Gamestore.Domain.Entities.GameVendorOffer", "GameVendorOffer")
-                        .WithMany("Discounts")
-                        .HasForeignKey("GameVendorOfferId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("GameVendorOffer");
                 });
 
             modelBuilder.Entity("Gamestore.Domain.Entities.GameDiscountSnapshot", b =>
@@ -895,11 +775,6 @@ namespace Gamestore.DAL.Migrations
                     b.Navigation("Comments");
 
                     b.Navigation("VendorOffers");
-                });
-
-            modelBuilder.Entity("Gamestore.Domain.Entities.GameVendorOffer", b =>
-                {
-                    b.Navigation("Discounts");
                 });
 
             modelBuilder.Entity("Gamestore.Domain.Entities.Genre", b =>

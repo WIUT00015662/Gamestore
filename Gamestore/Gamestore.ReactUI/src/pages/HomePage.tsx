@@ -2,13 +2,19 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { hasPermission } from '../auth';
-import type { Deal, Game } from '../types';
+import type { Deal, Game, Genre } from '../types';
 
 export function HomePage() {
   const navigate = useNavigate();
   const [deals, setDeals] = useState<Deal[]>([]);
   const [games, setGames] = useState<Game[]>([]);
   const [error, setError] = useState('');
+  const [subscriptionEmail, setSubscriptionEmail] = useState('');
+  const [subscriptionMessage, setSubscriptionMessage] = useState('');
+  const [subscriptionError, setSubscriptionError] = useState('');
+  const [unsubscribeEmail, setUnsubscribeEmail] = useState('');
+  const [unsubscribeMessage, setUnsubscribeMessage] = useState('');
+  const [unsubscribeError, setUnsubscribeError] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
@@ -23,6 +29,8 @@ export function HomePage() {
   const [sortingOptions, setSortingOptions] = useState<string[]>([]);
   const [publishDateOptions, setPublishDateOptions] = useState<string[]>([]);
   const [paginationOptions, setPaginationOptions] = useState<string[]>([]);
+  const [genres, setGenres] = useState<Genre[]>([]);
+  const [selectedGenre, setSelectedGenre] = useState('');
 
   const loadGames = async (nextPage: number, nextSearch = search) => {
     try {
@@ -47,16 +55,18 @@ export function HomePage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const [featuredDeals, sorting, publishDates, pagination] = await Promise.all([
+        const [featuredDeals, sorting, publishDates, pagination, genresResponse] = await Promise.all([
           api.getFeaturedDeals(),
           api.getSortingOptions(),
           api.getPublishDateOptions(),
           api.getPaginationOptions(),
+          api.getGenres(),
         ]);
         setDeals(featuredDeals);
         setSortingOptions(sorting);
         setPublishDateOptions(publishDates);
         setPaginationOptions(pagination);
+        setGenres(genresResponse);
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Failed to load home data');
       }
@@ -68,8 +78,23 @@ export function HomePage() {
   }, []);
 
   useEffect(() => {
+    if (selectedGenre) {
+      void (async () => {
+        try {
+          const response = await api.getGamesByGenreId(selectedGenre);
+          setGames(response);
+          setTotalPages(1);
+          setPage(1);
+          setError('');
+        } catch (e) {
+          setError(e instanceof Error ? e.message : 'Failed to load games');
+        }
+      })();
+      return;
+    }
+
     void loadGames(1, search);
-  }, [sort, datePublishing, pageCount]);
+  }, [sort, datePublishing, pageCount, selectedGenre]);
 
   const canPoll = hasPermission('ManageEntities');
 
@@ -80,6 +105,48 @@ export function HomePage() {
       setDeals(featuredDeals);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Polling failed');
+    }
+  };
+
+  const handleSubscribe = async (e: FormEvent) => {
+    e.preventDefault();
+    const email = subscriptionEmail.trim();
+    if (!email) {
+      setSubscriptionError('Please enter a valid email address.');
+      return;
+    }
+
+    try {
+      await api.subscribeToDiscounts(email);
+      setSubscriptionMessage('Thanks! You are subscribed for discount alerts.');
+      setSubscriptionError('');
+      setSubscriptionEmail('');
+      setUnsubscribeMessage('');
+      setUnsubscribeError('');
+    } catch (e) {
+      setSubscriptionError(e instanceof Error ? e.message : 'Subscription failed');
+      setSubscriptionMessage('');
+    }
+  };
+
+  const handleUnsubscribe = async (e: FormEvent) => {
+    e.preventDefault();
+    const email = unsubscribeEmail.trim();
+    if (!email) {
+      setUnsubscribeError('Please enter a valid email address.');
+      return;
+    }
+
+    try {
+      await api.unsubscribeFromDiscounts(email);
+      setUnsubscribeMessage('You have been unsubscribed.');
+      setUnsubscribeError('');
+      setUnsubscribeEmail('');
+      setSubscriptionMessage('');
+      setSubscriptionError('');
+    } catch (e) {
+      setUnsubscribeError(e instanceof Error ? e.message : 'Unsubscribe failed');
+      setUnsubscribeMessage('');
     }
   };
 
@@ -95,11 +162,16 @@ export function HomePage() {
       <section className="section">
         <div className="section-header">
           <h2>Top discounted deals</h2>
-          {canPoll && (
-            <button type="button" className="btn" onClick={handlePoll}>
-              Poll deals now
+          <div className="toolbar">
+            <button type="button" className="btn" onClick={() => navigate('/deals')}>
+              See all discounts
             </button>
-          )}
+            {canPoll && (
+              <button type="button" className="btn" onClick={handlePoll}>
+                Poll deals now
+              </button>
+            )}
+          </div>
         </div>
         {deals.length === 0 ? <p className="muted">No featured deals yet.</p> : null}
         <div className="card-grid">
@@ -120,6 +192,34 @@ export function HomePage() {
             </article>
           ))}
         </div>
+      </section>
+
+      <section className="section">
+        <h2>Get discount emails</h2>
+        <p className="muted">Subscribe as a guest or signed-in user to receive new discounts every interval.</p>
+        <form className="toolbar" onSubmit={(e) => void handleSubscribe(e)}>
+          <input
+            type="email"
+            placeholder="you@example.com"
+            value={subscriptionEmail}
+            onChange={(e) => setSubscriptionEmail(e.target.value)}
+          />
+          <button className="btn" type="submit">Subscribe</button>
+        </form>
+        {subscriptionMessage ? <p>{subscriptionMessage}</p> : null}
+        {subscriptionError ? <p className="error">{subscriptionError}</p> : null}
+        <div className="spacer" />
+        <form className="toolbar" onSubmit={(e) => void handleUnsubscribe(e)}>
+          <input
+            type="email"
+            placeholder="you@example.com"
+            value={unsubscribeEmail}
+            onChange={(e) => setUnsubscribeEmail(e.target.value)}
+          />
+          <button className="btn" type="submit">Unsubscribe</button>
+        </form>
+        {unsubscribeMessage ? <p>{unsubscribeMessage}</p> : null}
+        {unsubscribeError ? <p className="error">{unsubscribeError}</p> : null}
       </section>
 
       <section className="section">
@@ -147,6 +247,12 @@ export function HomePage() {
               <option key={option} value={option}>{option} / page</option>
             ))}
           </select>
+          <select value={selectedGenre} onChange={(e) => setSelectedGenre(e.target.value)}>
+            <option value="">All genres</option>
+            {genres.map((genre) => (
+              <option key={genre.id} value={genre.id}>{genre.name}</option>
+            ))}
+          </select>
           <input type="number" min="0" step="0.01" placeholder="Min price" value={minPrice} onChange={(e) => setMinPrice(e.target.value)} />
           <input type="number" min="0" step="0.01" placeholder="Max price" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} />
           <button className="btn" type="submit">Search</button>
@@ -160,6 +266,7 @@ export function HomePage() {
               setDatePublishing('');
               setMinPrice('');
               setMaxPrice('');
+              setSelectedGenre('');
               setPage(1);
               void loadGames(1, '');
             }}

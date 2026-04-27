@@ -7,111 +7,70 @@ namespace Gamestore.BLL.Services;
 
 public class GameDealsService(
     IUnitOfWork unitOfWork,
-    IDiscountSimulationService discountSimulationService,
-    IDiscountNotificationService discountNotificationService) : IGameDealsService
+    IDiscountProcessingService discountProcessingService,
+    IDiscountConfigurationService configurationService) : IGameDealsService
 {
     private readonly IUnitOfWork _unitOfWork = unitOfWork;
-    private readonly IDiscountSimulationService _discountSimulationService = discountSimulationService;
-    private readonly IDiscountNotificationService _discountNotificationService = discountNotificationService;
+    private readonly IDiscountProcessingService _discountProcessingService = discountProcessingService;
+    private readonly IDiscountConfigurationService _configurationService = configurationService;
 
+    /// <summary>
+    /// Executes the 5-step discount processing workflow.
+    /// </summary>
     public async Task<DiscountPollingResultResponse> PollDiscountsAsync()
     {
         await EnsureOffersSeededAsync();
 
-        var now = DateTime.UtcNow;
-        var pollingRunId = Guid.NewGuid();
-
-        List<GameVendorOffer> offers = [.. await _unitOfWork.GameVendorOffers.GetAllAsync()];
-        var snapshots = new List<GameDiscountSnapshot>();
-
-        foreach (var offer in offers)
-        {
-            var discountPercent = _discountSimulationService.GenerateDiscountPercent();
-            if (discountPercent <= 0)
-            {
-                offer.LastPolledAt = now;
-                offer.LastPolledPrice = offer.Price;
-                _unitOfWork.GameVendorOffers.Update(offer);
-                continue;
-            }
-
-            var discountedPrice = Math.Round(offer.Price * (1 - (discountPercent / 100m)), 2, MidpointRounding.AwayFromZero);
-            offer.LastPolledAt = now;
-            offer.LastPolledPrice = discountedPrice;
-            _unitOfWork.GameVendorOffers.Update(offer);
-
-            if (discountPercent < 20)
-            {
-                continue;
-            }
-
-            snapshots.Add(new GameDiscountSnapshot
-            {
-                Id = Guid.NewGuid(),
-                PollingRunId = pollingRunId,
-                PolledAt = now,
-                GameId = offer.GameId,
-                GameName = offer.GameName,
-                Vendor = offer.Vendor,
-                PurchaseUrl = offer.PurchaseUrl,
-                OriginalPrice = offer.Price,
-                DiscountedPrice = discountedPrice,
-                DiscountPercent = discountPercent,
-            });
-        }
-
-        var featuredIds = snapshots
-            .OrderByDescending(x => x.DiscountPercent)
-            .Take(5)
-            .Select(x => x.Id)
-            .ToHashSet();
-
-        foreach (var snapshot in snapshots)
-        {
-            snapshot.IsFeatured = featuredIds.Contains(snapshot.Id);
-            await _unitOfWork.GameDiscountSnapshots.AddAsync(snapshot);
-        }
-
-        await _unitOfWork.SaveChangesAsync();
-
-        if (snapshots.Count > 0)
-        {
-            List<string> recipients =
-            [
-                .. (await _unitOfWork.Users.GetAllAsync())
-                    .Select(user => $"{user.Name}@gamestore.local"),
-            ];
-
-            await _discountNotificationService.NotifyUsersAsync(recipients, snapshots.Select(ToResponse));
-        }
+        var config = await _configurationService.GetActiveConfigurationAsync();
+        var pollingRun = await _discountProcessingService.ProcessDiscountsAsync(config);
 
         return new DiscountPollingResultResponse
         {
-            PollingRunId = pollingRunId,
-            PolledAt = now,
-            TotalDiscountedGames = snapshots.Count,
-            FeaturedGamesCount = snapshots.Count(x => x.IsFeatured),
+            PollingRunId = pollingRun.Id,
+            PolledAt = pollingRun.RunAt,
+            TotalDiscountedGames = pollingRun.NewDiscountsCreated + pollingRun.DiscountsReverted,
+            FeaturedGamesCount = (await _unitOfWork.GameDiscountSnapshots.FindAsync(
+                x => x.PollingRunId == pollingRun.Id && x.IsFeatured)).Count(),
         };
     }
 
     public async Task<IReadOnlyCollection<DiscountedGameResponse>> GetLatestFeaturedDiscountsAsync(int take = 5)
     {
-        List<GameDiscountSnapshot> snapshots = [.. await _unitOfWork.GameDiscountSnapshots.GetAllAsync()];
-        var latestRunId = snapshots
-            .OrderByDescending(x => x.PolledAt)
-            .Select(x => x.PollingRunId)
-            .FirstOrDefault();
+        var latestRun = await _unitOfWork.PollingRuns.GetLatestRunAsync();
+        if (latestRun == null)
+        {
+            return [];
+        }
 
-        return latestRunId == Guid.Empty
-            ? []
-            :
-            [
-                .. snapshots
-                    .Where(x => x.PollingRunId == latestRunId && x.IsFeatured)
-                    .OrderByDescending(x => x.DiscountPercent)
-                    .Take(take)
-                    .Select(ToResponse),
-            ];
+        var snapshots = await _unitOfWork.GameDiscountSnapshots.FindAsync(
+            x => x.PollingRunId == latestRun.Id && x.IsFeatured);
+
+        return [.. snapshots
+            .OrderByDescending(x => x.DiscountPercent)
+            .Take(take)
+            .Select(ToResponse)];
+    }
+
+    public async Task<IReadOnlyCollection<DiscountedGameResponse>> GetAllCurrentDiscountsAsync()
+    {
+        var latestRun = await _unitOfWork.PollingRuns.GetLatestRunAsync();
+        if (latestRun == null)
+        {
+            return [];
+        }
+
+        var snapshots = (await _unitOfWork.GameDiscountSnapshots.FindAsync(
+            x => x.PollingRunId == latestRun.Id)).ToList();
+
+        // Group by game and select only the highest discount per game
+        var groupedByGame = snapshots
+            .GroupBy(x => x.GameId)
+            .SelectMany(g => g.OrderByDescending(x => x.DiscountPercent).Take(1))
+            .OrderByDescending(x => x.DiscountPercent)
+            .Select(ToResponse)
+            .ToList();
+
+        return groupedByGame;
     }
 
     public async Task<IReadOnlyCollection<GameVendorOfferResponse>> GetOffersByGameKeyAsync(string key)
@@ -126,6 +85,43 @@ public class GameDealsService(
         ];
     }
 
+    public async Task<EmailSubscriptionResponse> SubscribeEmailAsync(string email)
+    {
+        var existing = await _unitOfWork.EmailSubscriptions.GetByEmailAsync(email);
+        if (existing != null)
+        {
+            existing.IsActive = true;
+            existing.UnsubscribedAt = null;
+            _unitOfWork.EmailSubscriptions.Update(existing);
+            await _unitOfWork.SaveChangesAsync();
+            return ToEmailSubscriptionResponse(existing);
+        }
+
+        var subscription = new EmailSubscription
+        {
+            Id = Guid.NewGuid(),
+            Email = email,
+            IsActive = true,
+            SubscribedAt = DateTime.UtcNow,
+        };
+
+        await _unitOfWork.EmailSubscriptions.AddAsync(subscription);
+        await _unitOfWork.SaveChangesAsync();
+        return ToEmailSubscriptionResponse(subscription);
+    }
+
+    public async Task UnsubscribeEmailAsync(string email)
+    {
+        var subscription = await _unitOfWork.EmailSubscriptions.GetByEmailAsync(email);
+        if (subscription != null)
+        {
+            subscription.IsActive = false;
+            subscription.UnsubscribedAt = DateTime.UtcNow;
+            _unitOfWork.EmailSubscriptions.Update(subscription);
+            await _unitOfWork.SaveChangesAsync();
+        }
+    }
+
     private async Task EnsureOffersSeededAsync()
     {
         var existingOffers = await _unitOfWork.GameVendorOffers.GetCountAsync();
@@ -137,6 +133,7 @@ public class GameDealsService(
         var games = await _unitOfWork.Games.GetAllAsync();
         foreach (var game in games)
         {
+            var gameHubPrice = Convert.ToDecimal(game.Price);
             await _unitOfWork.GameVendorOffers.AddAsync(new GameVendorOffer
             {
                 Id = Guid.NewGuid(),
@@ -144,9 +141,12 @@ public class GameDealsService(
                 GameName = game.Name,
                 Vendor = "GameHub",
                 PurchaseUrl = $"https://gamehub.local/{game.Key}",
-                Price = Convert.ToDecimal(game.Price),
+                Price = gameHubPrice,
+                TruePrice = gameHubPrice,
+                CurrentPrice = gameHubPrice,
             });
 
+            var metaPlayPrice = Math.Max(0.99m, gameHubPrice + 3m);
             await _unitOfWork.GameVendorOffers.AddAsync(new GameVendorOffer
             {
                 Id = Guid.NewGuid(),
@@ -154,9 +154,13 @@ public class GameDealsService(
                 GameName = game.Name,
                 Vendor = "MetaPlay",
                 PurchaseUrl = $"https://metaplay.local/{game.Key}",
-                Price = Math.Max(0.99m, Convert.ToDecimal(game.Price) + 3m),
+                Price = metaPlayPrice,
+                TruePrice = metaPlayPrice,
+                CurrentPrice = metaPlayPrice,
             });
         }
+
+        await _unitOfWork.SaveChangesAsync();
     }
 
     private static DiscountedGameResponse ToResponse(GameDiscountSnapshot snapshot)
@@ -183,6 +187,17 @@ public class GameDealsService(
             Price = offer.Price,
             LastPolledPrice = offer.LastPolledPrice,
             LastPolledAt = offer.LastPolledAt,
+        };
+    }
+
+    private static EmailSubscriptionResponse ToEmailSubscriptionResponse(EmailSubscription subscription)
+    {
+        return new EmailSubscriptionResponse
+        {
+            Id = subscription.Id,
+            Email = subscription.Email,
+            IsActive = subscription.IsActive,
+            SubscribedAt = subscription.SubscribedAt,
         };
     }
 }

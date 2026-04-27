@@ -12,6 +12,9 @@ export function EntitiesPage() {
   const [genreName, setGenreName] = useState('');
   const [platformType, setPlatformType] = useState('');
   const [publisher, setPublisher] = useState({ companyName: '', homePage: '', description: '' });
+  const [editGenreId, setEditGenreId] = useState('');
+  const [editPlatformId, setEditPlatformId] = useState('');
+  const [editPublisherId, setEditPublisherId] = useState('');
 
   const load = async () => {
     try {
@@ -31,9 +34,15 @@ export function EntitiesPage() {
 
   const createGenre = async () => {
     try {
-      await api.createGenre({ genre: { name: genreName } });
+      if (editGenreId) {
+        await api.updateGenre({ genre: { id: editGenreId, name: genreName } });
+        setEditGenreId('');
+        setMessage('Genre updated.');
+      } else {
+        await api.createGenre({ genre: { name: genreName } });
+        setMessage('Genre created.');
+      }
       setGenreName('');
-      setMessage('Genre created.');
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Create genre failed');
@@ -42,9 +51,15 @@ export function EntitiesPage() {
 
   const createPlatform = async () => {
     try {
-      await api.createPlatform({ platform: { type: platformType } });
+      if (editPlatformId) {
+        await api.updatePlatform({ platform: { id: editPlatformId, type: platformType } });
+        setEditPlatformId('');
+        setMessage('Platform updated.');
+      } else {
+        await api.createPlatform({ platform: { type: platformType } });
+        setMessage('Platform created.');
+      }
       setPlatformType('');
-      setMessage('Platform created.');
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Create platform failed');
@@ -53,13 +68,34 @@ export function EntitiesPage() {
 
   const createPublisher = async () => {
     try {
-      await api.createPublisher({ publisher });
+      if (editPublisherId) {
+        await api.updatePublisher({ publisher: { id: editPublisherId, ...publisher } });
+        setEditPublisherId('');
+        setMessage('Publisher updated.');
+      } else {
+        await api.createPublisher({ publisher });
+        setMessage('Publisher created.');
+      }
       setPublisher({ companyName: '', homePage: '', description: '' });
-      setMessage('Publisher created.');
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Create publisher failed');
     }
+  };
+
+  const selectGenre = (item: Genre) => {
+    setGenreName(item.name);
+    setEditGenreId(item.id);
+  };
+
+  const selectPlatform = (item: Platform) => {
+    setPlatformType(item.type);
+    setEditPlatformId(item.id);
+  };
+
+  const selectPublisher = (item: Publisher) => {
+    setPublisher({ companyName: item.companyName, homePage: item.homePage ?? '', description: item.description ?? '' });
+    setEditPublisherId(item.id);
   };
 
   return (
@@ -74,15 +110,23 @@ export function EntitiesPage() {
             {genres.map((item: Genre) => (
               <li key={item.id}>
                 <span>{item.name}</span>
-                <button type="button" className="btn-small danger" onClick={() => void api.deleteGenre(item.id).then(load)}>
-                  Delete
-                </button>
+                <div className="row-actions">
+                  <button type="button" className="btn-small" onClick={() => selectGenre(item)}>Edit</button>
+                  <button type="button" className="btn-small danger" onClick={() => void api.deleteGenre(item.id).then(load)}>
+                    Delete
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
           <div className="form">
-            <input value={genreName} onChange={(e: ChangeEvent<HTMLInputElement>) => setGenreName(e.target.value)} placeholder="New genre" />
-            <button type="button" className="btn" onClick={() => void createGenre()}>Add</button>
+            <input value={genreName} onChange={(e: ChangeEvent<HTMLInputElement>) => setGenreName(e.target.value)} placeholder="Genre name" />
+            <div className="row-actions">
+              <button type="button" className="btn" onClick={() => void createGenre()}>{editGenreId ? 'Update' : 'Add'}</button>
+              {editGenreId ? (
+                <button type="button" className="btn-small" onClick={() => { setEditGenreId(''); setGenreName(''); }}>Cancel</button>
+              ) : null}
+            </div>
           </div>
         </article>
 
@@ -92,15 +136,23 @@ export function EntitiesPage() {
             {platforms.map((item: Platform) => (
               <li key={item.id}>
                 <span>{item.type}</span>
-                <button type="button" className="btn-small danger" onClick={() => void api.deletePlatform(item.id).then(load)}>
-                  Delete
-                </button>
+                <div className="row-actions">
+                  <button type="button" className="btn-small" onClick={() => selectPlatform(item)}>Edit</button>
+                  <button type="button" className="btn-small danger" onClick={() => void api.deletePlatform(item.id).then(load)}>
+                    Delete
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
           <div className="form">
-            <input value={platformType} onChange={(e: ChangeEvent<HTMLInputElement>) => setPlatformType(e.target.value)} placeholder="New platform" />
-            <button type="button" className="btn" onClick={() => void createPlatform()}>Add</button>
+            <input value={platformType} onChange={(e: ChangeEvent<HTMLInputElement>) => setPlatformType(e.target.value)} placeholder="Platform type" />
+            <div className="row-actions">
+              <button type="button" className="btn" onClick={() => void createPlatform()}>{editPlatformId ? 'Update' : 'Add'}</button>
+              {editPlatformId ? (
+                <button type="button" className="btn-small" onClick={() => { setEditPlatformId(''); setPlatformType(''); }}>Cancel</button>
+              ) : null}
+            </div>
           </div>
         </article>
 
@@ -110,9 +162,12 @@ export function EntitiesPage() {
             {publishers.map((item: Publisher) => (
               <li key={item.id}>
                 <span>{item.companyName}</span>
-                <button type="button" className="btn-small danger" onClick={() => void api.deletePublisher(item.id).then(load)}>
-                  Delete
-                </button>
+                <div className="row-actions">
+                  <button type="button" className="btn-small" onClick={() => selectPublisher(item)}>Edit</button>
+                  <button type="button" className="btn-small danger" onClick={() => void api.deletePublisher(item.id).then(load)}>
+                    Delete
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
@@ -132,7 +187,12 @@ export function EntitiesPage() {
               onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setPublisher((old) => ({ ...old, description: e.target.value }))}
               placeholder="Description"
             />
-            <button type="button" className="btn" onClick={() => void createPublisher()}>Add</button>
+            <div className="row-actions">
+              <button type="button" className="btn" onClick={() => void createPublisher()}>{editPublisherId ? 'Update' : 'Add'}</button>
+              {editPublisherId ? (
+                <button type="button" className="btn-small" onClick={() => { setEditPublisherId(''); setPublisher({ companyName: '', homePage: '', description: '' }); }}>Cancel</button>
+              ) : null}
+            </div>
           </div>
         </article>
       </div>

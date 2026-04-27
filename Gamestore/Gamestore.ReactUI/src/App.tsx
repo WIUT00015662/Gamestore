@@ -2,6 +2,7 @@ import { Link, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { clearToken, hasPermission, hasToken } from './auth';
 import { AdminPage } from './pages/AdminPage';
 import { CartPage } from './pages/CartPage';
+import { DealsPage } from './pages/DealsPage';
 import { EntitiesPage } from './pages/EntitiesPage';
 import { ForbiddenPage } from './pages/ForbiddenPage';
 import { GameDetailsPage } from './pages/GameDetailsPage';
@@ -42,6 +43,7 @@ export function App({ refreshAuth }: AppProps) {
         <h1>Gamestore Aggregator</h1>
         <nav>
           <Link to="/">Home</Link>
+          <Link to="/deals">Deals</Link>
           {!isAuthenticated ? <Link to="/guest">Guest</Link> : null}
           {canManageComments ? <Link to="/moderator">Moderator</Link> : null}
           {canAccessManagerArea ? <Link to="/manager">Manager</Link> : null}
@@ -55,6 +57,7 @@ export function App({ refreshAuth }: AppProps) {
       <main className="content">
         <Routes>
           <Route path="/" element={<HomePage />} />
+          <Route path="/deals" element={<DealsPage />} />
           <Route path="/games" element={<GamesPage />} />
           <Route path="/games/:key" element={<GameDetailsPage />} />
           <Route path="/guest" element={<GuestPage />} />

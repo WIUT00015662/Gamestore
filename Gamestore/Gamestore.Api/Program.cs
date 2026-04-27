@@ -47,8 +47,11 @@ builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddScoped<ICommentService, CommentService>();
 builder.Services.AddScoped<IGameDealsService, GameDealsService>();
 builder.Services.AddScoped<IDiscountSimulationService, DiscountSimulationService>();
+builder.Services.AddScoped<IDiscountConfigurationService, DiscountConfigurationService>();
+builder.Services.AddScoped<IDiscountProcessingService, DiscountProcessingService>();
 builder.Services.AddScoped<IEmailService, SmtpEmailService>();
 builder.Services.AddScoped<IDiscountNotificationService, EmailDiscountNotificationService>();
+builder.Services.AddHostedService<DiscountPollingHostedService>();
 
 builder.Services.AddScoped<IAuthManagementService, AuthManagementService>();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
@@ -88,8 +91,6 @@ builder.Services.AddOptions<PaymentMethodsConfig>()
 builder.Services.AddOptions<SmtpSettings>()
     .Bind(builder.Configuration.GetSection(SmtpSettings.SectionName));
 builder.Services.AddSingleton(builder.Configuration.GetSection("PaymentGatewaySettings").Get<PaymentGatewaySettings>() ?? new PaymentGatewaySettings());
-builder.Services.AddSingleton(builder.Configuration.GetSection("DiscountPolling").Get<DiscountPollingOptions>() ?? new DiscountPollingOptions());
-builder.Services.AddHostedService<DiscountPollingBackgroundService>();
 builder.Services.AddScoped<IPaymentGatewayClient, PaymentGatewayClient>();
 
 builder.Services.AddCors(options =>
@@ -115,7 +116,7 @@ app.UseMiddleware<GlobalExceptionHandlerMiddleware>();
 app.UseCors("GameStoreFrontend");
 app.UseMiddleware<RequestLoggingMiddleware>();
 
-app.UseMiddleware<GameCountMiddleware>();
+// app.UseMiddleware<GameCountMiddleware>();
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();

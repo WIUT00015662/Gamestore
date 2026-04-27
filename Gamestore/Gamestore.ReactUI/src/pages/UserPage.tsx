@@ -16,7 +16,7 @@ export function UserPage() {
       }
 
       try {
-        setOrders(await api.getOrders());
+        setOrders(await api.getMyOrders());
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Failed to load orders');
       }

@@ -138,6 +138,20 @@ textarea {
   flex-wrap: wrap;
 }
 
+.section .form,
+.section .toolbar {
+  margin-top: 10px;
+}
+
+.section .form + .form,
+.section .toolbar + .toolbar {
+  margin-top: 12px;
+}
+
+.spacer {
+  height: 12px;
+}
+
 .form-wrap {
   max-width: 420px;
 }
@@ -164,10 +178,20 @@ textarea {
   justify-content: space-between;
   border-bottom: 1px solid #e6ebf2;
   padding: 8px 0;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .list.compact li {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.list li span {
+  word-break: break-word;
 }
 
 .nested li {
@@ -212,6 +236,7 @@ textarea {
 .row-actions {
   display: inline-flex;
   gap: 6px;
+  flex-wrap: wrap;
 }
 
 .btn-small {
@@ -230,14 +255,15 @@ textarea {
 
 .check-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 6px 12px;
   width: 100%;
 }
 
 .check-grid label {
   display: inline-flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
   font-size: 13px;
+  word-break: break-word;
 }

@@ -78,6 +78,26 @@ public class GamestoreDbContext(DbContextOptions<GamestoreDbContext> options) : 
     /// </summary>
     public DbSet<GameDiscountSnapshot> GameDiscountSnapshots { get; set; }
 
+    /// <summary>
+    /// Gets or sets the EmailSubscriptions DbSet.
+    /// </summary>
+    public DbSet<EmailSubscription> EmailSubscriptions { get; set; }
+
+    /// <summary>
+    /// Gets or sets the GameDiscounts DbSet.
+    /// </summary>
+    public DbSet<GameDiscount> GameDiscounts { get; set; }
+
+    /// <summary>
+    /// Gets or sets the DiscountConfigurations DbSet.
+    /// </summary>
+    public DbSet<DiscountConfiguration> DiscountConfigurations { get; set; }
+
+    /// <summary>
+    /// Gets or sets the PollingRuns DbSet.
+    /// </summary>
+    public DbSet<PollingRun> PollingRuns { get; set; }
+
     /// <inheritdoc/>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

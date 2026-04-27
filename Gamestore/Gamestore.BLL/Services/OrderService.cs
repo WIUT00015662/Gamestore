@@ -137,12 +137,7 @@ public class OrderService(
         var order = await _unitOfWork.Orders.GetByIdAsync(orderId)
             ?? throw new EntityNotFoundException(nameof(Order), orderId);
 
-        if (order.CustomerId != userId)
-        {
-            throw new ArgumentException("Unauthorized access to this order.");
-        }
-
-        return order.ToOrderResponse();
+        return order.CustomerId != userId ? throw new ArgumentException("Unauthorized access to this order.") : order.ToOrderResponse();
     }
 
     /// <summary>
@@ -153,12 +148,9 @@ public class OrderService(
         var order = await _unitOfWork.Orders.GetByIdWithDetailsAsync(orderId)
             ?? throw new EntityNotFoundException(nameof(Order), orderId);
 
-        if (order.CustomerId != userId)
-        {
-            throw new ArgumentException("Unauthorized access to this order.");
-        }
-
-        return order.OrderGames.ToOrderGameResponse();
+        return order.CustomerId != userId
+            ? throw new ArgumentException("Unauthorized access to this order.")
+            : order.OrderGames.ToOrderGameResponse();
     }
 
     /// <summary>
@@ -202,14 +194,13 @@ public class OrderService(
     {
         return new PaymentMethodsResponse
         {
-            PaymentMethods = _paymentMethodsConfig.Methods
+            PaymentMethods = [.. _paymentMethodsConfig.Methods
                 .Select(m => new PaymentMethodResponse
                 {
                     ImageUrl = m.ImageUrl,
                     Title = m.Title,
                     Description = m.Description,
-                })
-                .ToList(),
+                })],
         };
     }
 

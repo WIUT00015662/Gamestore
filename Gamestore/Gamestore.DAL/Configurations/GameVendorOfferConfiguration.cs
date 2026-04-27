@@ -13,6 +13,8 @@ internal sealed class GameVendorOfferConfiguration : IEntityTypeConfiguration<Ga
         builder.Property(x => x.Vendor).IsRequired();
         builder.Property(x => x.PurchaseUrl).IsRequired();
         builder.Property(x => x.Price).HasPrecision(18, 2);
+        builder.Property(x => x.TruePrice).HasPrecision(18, 2);
+        builder.Property(x => x.CurrentPrice).HasPrecision(18, 2);
         builder.Property(x => x.LastPolledPrice).HasPrecision(18, 2);
 
         builder.HasIndex(x => new { x.GameId, x.Vendor, x.PurchaseUrl }).IsUnique();
@@ -20,6 +22,11 @@ internal sealed class GameVendorOfferConfiguration : IEntityTypeConfiguration<Ga
         builder.HasOne(x => x.Game)
             .WithMany(g => g.VendorOffers)
             .HasForeignKey(x => x.GameId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasMany(x => x.Discounts)
+            .WithOne(d => d.GameVendorOffer)
+            .HasForeignKey(d => d.GameVendorOfferId)
             .OnDelete(DeleteBehavior.Cascade);
     }
 }

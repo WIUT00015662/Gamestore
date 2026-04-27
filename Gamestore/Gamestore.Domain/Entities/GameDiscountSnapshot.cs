@@ -24,5 +24,7 @@ public class GameDiscountSnapshot
 
     public bool IsFeatured { get; set; }
 
+    public bool IsNewDiscount { get; set; }
+
     public Game? Game { get; set; }
 }

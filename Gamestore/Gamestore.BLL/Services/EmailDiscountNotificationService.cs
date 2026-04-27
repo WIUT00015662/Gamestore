@@ -24,7 +24,7 @@ public class EmailDiscountNotificationService(
         try
         {
             await _emailService.SendEmailsAsync(recipients, subject, body);
-            _logger.LogInformation("Discount notification sent to {RecipientCount} users for {DealCount} deals", 
+            _logger.LogInformation("Discount notification sent to {RecipientCount} users for {DealCount} deals",
                 recipients.Count(), deals.Count);
         }
         catch (Exception ex)
