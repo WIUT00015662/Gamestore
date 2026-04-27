@@ -7,8 +7,10 @@ ENV_FILE="deployment/gcp/.env.prod"
 
 cd "$APP_DIR"
 
-echo "Pulling latest source..."
-git pull origin main
+if [ ! -f "$ENV_FILE" ]; then
+	echo "Missing $ENV_FILE on VM. Create it with production secrets before deploying."
+	exit 1
+fi
 
 echo "Pulling latest images from Docker Hub..."
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" pull

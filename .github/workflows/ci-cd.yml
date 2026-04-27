@@ -130,11 +130,13 @@ jobs:
           --project=${{ env.GCP_PROJECT_ID }} \
           --quiet \
           --command='set -e
-            git config --global --add safe.directory /opt/gamestore
+            mkdir -p /opt/gamestore/deployment/gcp/nginx
+            curl -fsSL -o /opt/gamestore/docker-compose.prod.yml \
+              https://raw.githubusercontent.com/WIUT00015662/Gamestore/main/docker-compose.prod.yml
+            curl -fsSL -o /opt/gamestore/deployment/gcp/nginx/gamestore.conf \
+              https://raw.githubusercontent.com/WIUT00015662/Gamestore/main/deployment/gcp/nginx/gamestore.conf
             cd /opt/gamestore
-            git fetch origin main
-            git reset --hard origin/main
-            git clean -fd
-            chmod +x deployment/gcp/deploy.sh
-            bash deployment/gcp/deploy.sh
+            docker compose --env-file deployment/gcp/.env.prod -f docker-compose.prod.yml pull
+            docker compose --env-file deployment/gcp/.env.prod -f docker-compose.prod.yml down --remove-orphans
+            docker compose --env-file deployment/gcp/.env.prod -f docker-compose.prod.yml up -d --force-recreate
             docker compose --env-file deployment/gcp/.env.prod -f docker-compose.prod.yml ps'
