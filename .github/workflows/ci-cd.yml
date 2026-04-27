@@ -19,6 +19,7 @@ env:
   GCP_SERVICE_ACCOUNT: ${{ vars.GCP_SERVICE_ACCOUNT }}
   GCP_VM_NAME: ${{ vars.GCP_VM_NAME }}
   GCP_ZONE: ${{ vars.GCP_ZONE }}
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   quality-and-tests:
@@ -127,4 +128,11 @@ jobs:
           gcloud compute ssh ${{ env.GCP_VM_NAME }} \
             --zone=${{ env.GCP_ZONE }} \
             --project=${{ env.GCP_PROJECT_ID }} \
-            --command='set -e; cd /opt/gamestore; git pull origin main; chmod +x deployment/gcp/deploy.sh; ./deployment/gcp/deploy.sh; docker compose --env-file deployment/gcp/.env.prod -f docker-compose.prod.yml ps'
+            --quiet \
+            --command='set -e
+              git config --global --add safe.directory /opt/gamestore
+              cd /opt/gamestore
+              git pull origin main
+              chmod +x deployment/gcp/deploy.sh
+              bash deployment/gcp/deploy.sh
+              docker compose --env-file deployment/gcp/.env.prod -f docker-compose.prod.yml ps'
