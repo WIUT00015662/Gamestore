@@ -106,6 +106,13 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+if (app.Configuration.GetValue<bool>("Database:ApplyMigrations"))
+{
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<GamestoreDbContext>();
+    await db.Database.MigrateAsync();
+}
+
 using (var scope = app.Services.CreateScope())
 {
     var authService = scope.ServiceProvider.GetRequiredService<IAuthManagementService>();

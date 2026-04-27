@@ -21,7 +21,7 @@ services:
       JwtSettings__Audience: ${JWT_AUDIENCE}
       JwtSettings__Key: ${JWT_KEY}
       JwtSettings__ExpirationMinutes: ${JWT_EXPIRATION_MINUTES:-120}
-      OrderSettings__CustomerId: ${ORDER_CUSTOMER_ID}
+      Database__ApplyMigrations: ${DB_APPLY_MIGRATIONS:-false}
       OrderSettings__BankInvoiceValidityDays: ${BANK_INVOICE_VALIDITY_DAYS:-3}
       OrderSettings__PaymentRetryCount: ${PAYMENT_RETRY_COUNT:-3}
       PaymentGatewaySettings__SimulationEnabled: ${PAYMENT_SIMULATION_ENABLED:-true}
