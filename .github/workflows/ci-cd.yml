@@ -126,13 +126,7 @@ jobs:
       - name: Deploy to GCP VM
         run: |
           gcloud compute ssh ${{ env.GCP_VM_NAME }} \
-            --zone=${{ env.GCP_ZONE }} \
-            --project=${{ env.GCP_PROJECT_ID }} \
-            --quiet \
-            --command='set -e
-              git config --global --add safe.directory /opt/gamestore
-              cd /opt/gamestore
-              git pull origin main
-              chmod +x deployment/gcp/deploy.sh
-              bash deployment/gcp/deploy.sh
-              docker compose --env-file deployment/gcp/.env.prod -f docker-compose.prod.yml ps'
+          --zone=${{ env.GCP_ZONE }} \
+          --project=${{ env.GCP_PROJECT_ID }} \
+          --quiet \
+          --command='whoami && echo "home: $HOME"'
