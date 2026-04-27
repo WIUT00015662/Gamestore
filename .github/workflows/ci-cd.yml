@@ -136,7 +136,12 @@ jobs:
             curl -fsSL -o /opt/gamestore/deployment/gcp/nginx/gamestore.conf \
               https://raw.githubusercontent.com/WIUT00015662/Gamestore/main/deployment/gcp/nginx/gamestore.conf
             cd /opt/gamestore
+            echo "Disk space before cleanup:"
+            df -h /
+            docker container prune -f
+            docker image prune -af
+            docker builder prune -af
             docker compose --env-file deployment/gcp/.env.prod -f docker-compose.prod.yml pull
             docker compose --env-file deployment/gcp/.env.prod -f docker-compose.prod.yml down --remove-orphans
-            docker compose --env-file deployment/gcp/.env.prod -f docker-compose.prod.yml up -d --force-recreate
+            docker compose --env-file deployment/gcp/.env.prod -f docker-compose.prod.yml up -d
             docker compose --env-file deployment/gcp/.env.prod -f docker-compose.prod.yml ps'
