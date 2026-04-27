@@ -132,7 +132,9 @@ jobs:
           --command='set -e
             git config --global --add safe.directory /opt/gamestore
             cd /opt/gamestore
-            git pull origin main
+            git fetch origin main
+            git reset --hard origin/main
+            git clean -fd
             chmod +x deployment/gcp/deploy.sh
             bash deployment/gcp/deploy.sh
             docker compose --env-file deployment/gcp/.env.prod -f docker-compose.prod.yml ps'
