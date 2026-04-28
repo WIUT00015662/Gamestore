@@ -13,28 +13,23 @@ public class GameRepository(GamestoreDbContext context) : Repository<Game>(conte
     /// <inheritdoc/>
     public override async Task<Game?> GetByIdAsync(Guid id)
     {
-        return await DbSet.FirstOrDefaultAsync(g => g.Id == id && !g.IsDeleted);
+        return await DbSet.FirstOrDefaultAsync(g => g.Id == id);
     }
 
     /// <inheritdoc/>
     public override async Task<IEnumerable<Game>> GetAllAsync()
     {
-        return await DbSet.Where(g => !g.IsDeleted).ToListAsync();
+        return await DbSet.ToListAsync();
     }
 
     /// <inheritdoc/>
     public override async Task<int> GetCountAsync()
     {
-        return await DbSet.CountAsync(g => !g.IsDeleted);
+        return await DbSet.CountAsync();
     }
 
     /// <inheritdoc/>
     public async Task<Game?> GetByKeyAsync(string key)
-    {
-        return await DbSet.FirstOrDefaultAsync(g => g.Key == key && !g.IsDeleted);
-    }
-
-    public async Task<Game?> GetByKeyIncludingDeletedAsync(string key)
     {
         return await DbSet.FirstOrDefaultAsync(g => g.Key == key);
     }
@@ -46,7 +41,8 @@ public class GameRepository(GamestoreDbContext context) : Repository<Game>(conte
             .Include(g => g.Genres)
             .Include(g => g.Platforms)
             .Include(g => g.Publisher)
-            .FirstOrDefaultAsync(g => g.Key == key && !g.IsDeleted);
+            .Include(g => g.VendorOffers)
+            .FirstOrDefaultAsync(g => g.Key == key);
     }
 
     /// <inheritdoc/>
@@ -56,15 +52,7 @@ public class GameRepository(GamestoreDbContext context) : Repository<Game>(conte
             .Include(g => g.Genres)
             .Include(g => g.Platforms)
             .Include(g => g.Publisher)
-            .FirstOrDefaultAsync(g => g.Id == id && !g.IsDeleted);
-    }
-
-    public async Task<Game?> GetByIdWithDetailsIncludingDeletedAsync(Guid id)
-    {
-        return await DbSet
-            .Include(g => g.Genres)
-            .Include(g => g.Platforms)
-            .Include(g => g.Publisher)
+            .Include(g => g.VendorOffers)
             .FirstOrDefaultAsync(g => g.Id == id);
     }
 
@@ -72,7 +60,7 @@ public class GameRepository(GamestoreDbContext context) : Repository<Game>(conte
     public async Task<IEnumerable<Game>> GetByGenreIdAsync(Guid genreId)
     {
         return await DbSet
-            .Where(g => !g.IsDeleted && g.Genres.Any(genre => genre.Id == genreId))
+            .Where(g => g.Genres.Any(genre => genre.Id == genreId))
             .ToListAsync();
     }
 
@@ -80,7 +68,7 @@ public class GameRepository(GamestoreDbContext context) : Repository<Game>(conte
     public async Task<IEnumerable<Game>> GetByPlatformIdAsync(Guid platformId)
     {
         return await DbSet
-            .Where(g => !g.IsDeleted && g.Platforms.Any(p => p.Id == platformId))
+            .Where(g => g.Platforms.Any(p => p.Id == platformId))
             .ToListAsync();
     }
 
@@ -89,7 +77,7 @@ public class GameRepository(GamestoreDbContext context) : Repository<Game>(conte
     {
         return await DbSet
             .Include(g => g.Publisher)
-            .Where(g => !g.IsDeleted && g.Publisher != null && g.Publisher.CompanyName == companyName)
+            .Where(g => g.Publisher != null && g.Publisher.CompanyName == companyName)
             .ToListAsync();
     }
 
@@ -97,47 +85,28 @@ public class GameRepository(GamestoreDbContext context) : Repository<Game>(conte
     public async Task<IEnumerable<Game>> GetAllWithDetailsAsync()
     {
         return await DbSet
-            .Where(g => !g.IsDeleted)
             .Include(g => g.Genres)
             .Include(g => g.Platforms)
             .Include(g => g.Publisher)
-            .ToListAsync();
-    }
-
-    public async Task<IEnumerable<Game>> GetAllWithDetailsIncludingDeletedAsync()
-    {
-        return await DbSet
-            .Include(g => g.Genres)
-            .Include(g => g.Platforms)
-            .Include(g => g.Publisher)
+            .Include(g => g.VendorOffers)
             .ToListAsync();
     }
 
     /// <inheritdoc/>
     public async Task<int> GetTotalCountAsync()
     {
-        return await DbSet.CountAsync(g => !g.IsDeleted);
+        return await DbSet.CountAsync();
     }
 
     /// <inheritdoc/>
     public IQueryable<Game> GetQueryable()
     {
         return DbSet
-            .Where(g => !g.IsDeleted)
             .Include(g => g.Genres)
             .Include(g => g.Platforms)
             .Include(g => g.Publisher)
             .Include(g => g.Comments)
-            .AsQueryable();
-    }
-
-    public IQueryable<Game> GetQueryableIncludingDeleted()
-    {
-        return DbSet
-            .Include(g => g.Genres)
-            .Include(g => g.Platforms)
-            .Include(g => g.Publisher)
-            .Include(g => g.Comments)
+            .Include(g => g.VendorOffers)
             .AsQueryable();
     }
 

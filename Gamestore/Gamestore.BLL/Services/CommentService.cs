@@ -62,7 +62,7 @@ public class CommentService(IUnitOfWork unitOfWork) : ICommentService
 
     public async Task<IEnumerable<CommentResponse>> GetCommentsByGameKeyAsync(string gameKey)
     {
-        var game = await _unitOfWork.Games.GetByKeyIncludingDeletedAsync(gameKey)
+        var game = await _unitOfWork.Games.GetByKeyAsync(gameKey)
             ?? throw new EntityNotFoundException(nameof(Game), gameKey);
 
         List<Comment> comments = [.. await _unitOfWork.Comments.GetByGameIdAsync(game.Id)];
@@ -91,7 +91,7 @@ public class CommentService(IUnitOfWork unitOfWork) : ICommentService
 
     public async Task UpdateCommentAsync(string gameKey, Guid commentId, UpdateCommentRequest request, Guid actorUserId, string actorName)
     {
-        var game = await _unitOfWork.Games.GetByKeyIncludingDeletedAsync(gameKey)
+        var game = await _unitOfWork.Games.GetByKeyAsync(gameKey)
             ?? throw new EntityNotFoundException(nameof(Game), gameKey);
 
         var comment = await _unitOfWork.Comments.GetByIdWithDetailsAsync(commentId)
@@ -123,7 +123,7 @@ public class CommentService(IUnitOfWork unitOfWork) : ICommentService
 
     public async Task DeleteCommentAsync(string gameKey, Guid commentId, Guid actorUserId, string actorName, bool canManageComments)
     {
-        var game = await _unitOfWork.Games.GetByKeyIncludingDeletedAsync(gameKey)
+        var game = await _unitOfWork.Games.GetByKeyAsync(gameKey)
             ?? throw new EntityNotFoundException(nameof(Game), gameKey);
 
         var comment = await _unitOfWork.Comments.GetByIdWithDetailsAsync(commentId)

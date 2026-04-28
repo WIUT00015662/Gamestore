@@ -138,38 +138,16 @@ public class AuthManagementServiceTests
     }
 
     [Fact]
-    public async Task CheckAccessAsyncReturnsFalseForDeletedGameWithoutViewDeletedPermission()
+    public async Task CheckAccessAsyncReturnsTrueForExistingGame()
     {
         var principal = CreatePrincipal(Permissions.ViewGame);
         var gameId = Guid.NewGuid();
 
-        _gameRepositoryMock.Setup(x => x.GetByIdWithDetailsIncludingDeletedAsync(gameId)).ReturnsAsync(new Game
+        _gameRepositoryMock.Setup(x => x.GetByIdWithDetailsAsync(gameId)).ReturnsAsync(new Game
         {
             Id = gameId,
-            Name = "Deleted game",
-            Key = "deleted-game",
-            IsDeleted = true,
-        });
-
-        var request = new AccessRequest { TargetPage = "games", TargetId = gameId };
-
-        var result = await _service.CheckAccessAsync(principal, request);
-
-        Assert.False(result);
-    }
-
-    [Fact]
-    public async Task CheckAccessAsyncReturnsTrueForDeletedGameWithViewDeletedPermission()
-    {
-        var principal = CreatePrincipal(Permissions.ViewGame, Permissions.ViewDeletedGames);
-        var gameId = Guid.NewGuid();
-
-        _gameRepositoryMock.Setup(x => x.GetByIdWithDetailsIncludingDeletedAsync(gameId)).ReturnsAsync(new Game
-        {
-            Id = gameId,
-            Name = "Deleted game",
-            Key = "deleted-game",
-            IsDeleted = true,
+            Name = "Game",
+            Key = "game",
         });
 
         var request = new AccessRequest { TargetPage = "games", TargetId = gameId };

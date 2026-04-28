@@ -1,30 +1,28 @@
 import { useEffect, useState, type ChangeEvent } from 'react';
 import { api } from '../api/client';
-import type { Game, Genre, Platform, Publisher } from '../types';
+import type { Game, GameVendorOfferInput, Genre, Platform, Publisher } from '../types';
 
 type GameForm = {
   id?: string;
   name: string;
   key: string;
   description: string;
-  price: number;
   unitInStock: number;
-  discount: number;
   publisher: string;
   genres: string[];
   platforms: string[];
+  vendorOffers: GameVendorOfferInput[];
 };
 
 const emptyForm: GameForm = {
   name: '',
   key: '',
   description: '',
-  price: 0,
   unitInStock: 0,
-  discount: 0,
   publisher: '',
   genres: [],
   platforms: [],
+  vendorOffers: [],
 };
 
 function toggle(values: string[], value: string) {
@@ -45,13 +43,13 @@ export function GamesManagementPage() {
   const load = async () => {
     try {
       const [gamesResponse, genresResponse, platformsResponse, publishersResponse] = await Promise.all([
-        api.getAllGamesRaw(),
+        api.getAllGamesForManagement(),
         api.getGenres(),
         api.getPlatforms(),
         api.getPublishers(),
       ]);
 
-      setGames(gamesResponse);
+      setGames(gamesResponse.games);
       setGenres(genresResponse);
       setPlatforms(platformsResponse);
       setPublishers(publishersResponse);
@@ -71,15 +69,24 @@ export function GamesManagementPage() {
 
   const createGame = async () => {
     try {
+      if (form.vendorOffers.length === 0) {
+        setError('At least one seller offer is required.');
+        return;
+      }
+
       await api.createGame({
         game: {
           name: form.name,
           key: form.key,
           description: form.description,
-          price: form.price,
           unitInStock: form.unitInStock,
-          discount: form.discount,
         },
+        vendorOffers: form.vendorOffers.map(({ vendor, purchaseUrl, price, referencePrice }) => ({
+          vendor,
+          purchaseUrl,
+          price,
+          referencePrice,
+        })),
         genres: form.genres,
         platforms: form.platforms,
         publisher: form.publisher,
@@ -99,16 +106,25 @@ export function GamesManagementPage() {
     }
 
     try {
+      if (form.vendorOffers.length === 0) {
+        setError('At least one seller offer is required.');
+        return;
+      }
+
       await api.updateGame({
         game: {
           id: form.id,
           name: form.name,
           key: form.key,
           description: form.description,
-          price: form.price,
           unitInStock: form.unitInStock,
-          discount: form.discount,
         },
+        vendorOffers: form.vendorOffers.map(({ vendor, purchaseUrl, price, referencePrice }) => ({
+          vendor,
+          purchaseUrl,
+          price,
+          referencePrice,
+        })),
         genres: form.genres,
         platforms: form.platforms,
         publisher: form.publisher,
@@ -122,16 +138,58 @@ export function GamesManagementPage() {
     }
   };
 
-  const selectGame = (game: Game) => {
+  const selectGame = async (game: Game) => {
+    try {
+      const [offers, gameGenres, gamePlatforms, gamePublisher] = await Promise.all([
+        api.getOffers(game.key),
+        api.getGameGenres(game.key),
+        api.getGamePlatforms(game.key),
+        api.getGamePublisher(game.key),
+      ]);
+      setForm((old) => ({
+        ...old,
+        id: game.id,
+        name: game.name,
+        key: game.key,
+        description: game.description ?? '',
+        unitInStock: game.unitInStock,
+        publisher: gamePublisher.id,
+        genres: gameGenres.map((genre) => genre.id),
+        platforms: gamePlatforms.map((platform) => platform.id),
+        vendorOffers: offers.map((offer) => ({
+          clientId: crypto.randomUUID(),
+          vendor: offer.vendor,
+          purchaseUrl: offer.purchaseUrl,
+          price: offer.price,
+          referencePrice: offer.price,
+        })),
+      }));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load game offers');
+    }
+  };
+
+  const updateOffer = (index: number, next: Partial<GameVendorOfferInput>) => {
     setForm((old) => ({
       ...old,
-      id: game.id,
-      name: game.name,
-      key: game.key,
-      description: game.description ?? '',
-      price: game.price,
-      unitInStock: game.unitInStock,
-      discount: game.discount,
+      vendorOffers: old.vendorOffers.map((offer, i) => (i === index ? { ...offer, ...next } : offer)),
+    }));
+  };
+
+  const addOffer = () => {
+    setForm((old) => ({
+      ...old,
+      vendorOffers: [
+        ...old.vendorOffers,
+        { clientId: crypto.randomUUID(), vendor: '', purchaseUrl: '', price: 0, referencePrice: 0 },
+      ],
+    }));
+  };
+
+  const removeOffer = (index: number) => {
+    setForm((old) => ({
+      ...old,
+      vendorOffers: old.vendorOffers.filter((_, i) => i !== index),
     }));
   };
 
@@ -182,16 +240,8 @@ export function GamesManagementPage() {
               <textarea value={form.description} onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setForm((old) => ({ ...old, description: e.target.value }))} placeholder="Description" />
             </label>
             <label>
-              Price
-              <input type="number" value={form.price} onChange={(e: ChangeEvent<HTMLInputElement>) => setForm((old) => ({ ...old, price: Number(e.target.value) }))} placeholder="Price" />
-            </label>
-            <label>
               Stock
               <input type="number" value={form.unitInStock} onChange={(e: ChangeEvent<HTMLInputElement>) => setForm((old) => ({ ...old, unitInStock: Number(e.target.value) }))} placeholder="Stock" />
-            </label>
-            <label>
-              Discount (%)
-              <input type="number" value={form.discount} onChange={(e: ChangeEvent<HTMLInputElement>) => setForm((old) => ({ ...old, discount: Number(e.target.value) }))} placeholder="Discount" />
             </label>
 
             <select value={form.publisher} onChange={(e: ChangeEvent<HTMLSelectElement>) => setForm((old) => ({ ...old, publisher: e.target.value }))}>
@@ -225,6 +275,50 @@ export function GamesManagementPage() {
                   {platform.type}
                 </label>
               ))}
+            </div>
+
+            <div className="form">
+              <h4>Seller offers</h4>
+              {form.vendorOffers.map((offer, index) => (
+                <div key={offer.clientId ?? `${offer.vendor}-${index}`} className="card form">
+                  <label>
+                    Seller
+                    <input
+                      value={offer.vendor}
+                      onChange={(e: ChangeEvent<HTMLInputElement>) => updateOffer(index, { vendor: e.target.value })}
+                      placeholder="Vendor name"
+                    />
+                  </label>
+                  <label>
+                    Purchase URL
+                    <input
+                      value={offer.purchaseUrl}
+                      onChange={(e: ChangeEvent<HTMLInputElement>) => updateOffer(index, { purchaseUrl: e.target.value })}
+                      placeholder="https://example.com"
+                    />
+                  </label>
+                  <label>
+                    Current price
+                    <input
+                      type="number"
+                      value={offer.price}
+                      onChange={(e: ChangeEvent<HTMLInputElement>) => updateOffer(index, { price: Number(e.target.value) })}
+                      placeholder="Price"
+                    />
+                  </label>
+                  <label>
+                    Reference price
+                    <input
+                      type="number"
+                      value={offer.referencePrice}
+                      onChange={(e: ChangeEvent<HTMLInputElement>) => updateOffer(index, { referencePrice: Number(e.target.value) })}
+                      placeholder="Reference price"
+                    />
+                  </label>
+                  <button type="button" className="btn-small danger" onClick={() => removeOffer(index)}>Remove offer</button>
+                </div>
+              ))}
+              <button type="button" className="btn-small" onClick={addOffer}>Add offer</button>
             </div>
 
             {form.id ? (

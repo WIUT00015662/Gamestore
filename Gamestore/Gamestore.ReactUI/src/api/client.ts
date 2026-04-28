@@ -75,11 +75,15 @@ export const api = {
   getPaginationOptions: () => request<string[]>('/games/pagination-options'),
   getSortingOptions: () => request<string[]>('/games/sorting-options'),
   getPublishDateOptions: () => request<string[]>('/games/publish-date-options'),
+  getAllGamesForManagement: () => request<GetGamesResponse>('/games?page=1&pageCount=all'),
   getAllGamesRaw: () => request<Game[]>('/games/all'),
   getGame: (key: string) => request<Game>(`/games/${key}`),
-  createGame: (payload: { game: { name: string; key: string; description: string; price: number; unitInStock: number; discount: number }; genres: string[]; platforms: string[]; publisher: string }) =>
+  getGameGenres: (key: string) => request<Genre[]>(`/games/${key}/genres`),
+  getGamePlatforms: (key: string) => request<Platform[]>(`/games/${key}/platforms`),
+  getGamePublisher: (key: string) => request<Publisher>(`/games/${key}/publisher`),
+  createGame: (payload: { game: { name: string; key: string; description: string; unitInStock: number }; vendorOffers: { vendor: string; purchaseUrl: string; price: number; referencePrice: number }[]; genres: string[]; platforms: string[]; publisher: string }) =>
     request<Game>('/games', { method: 'POST', body: JSON.stringify(payload) }),
-  updateGame: (payload: { game: { id: string; name: string; key: string; description: string; price: number; unitInStock: number; discount: number }; genres: string[]; platforms: string[]; publisher: string }) =>
+  updateGame: (payload: { game: { id: string; name: string; key: string; description: string; unitInStock: number }; vendorOffers: { vendor: string; purchaseUrl: string; price: number; referencePrice: number }[]; genres: string[]; platforms: string[]; publisher: string }) =>
     request<void>('/games', { method: 'PUT', body: JSON.stringify(payload) }),
   deleteGame: (key: string) => request<void>(`/games/${key}`, { method: 'DELETE' }),
   buyGame: (key: string) => request<void>(`/games/${key}/buy`, { method: 'POST' }),
@@ -138,12 +142,12 @@ export const api = {
   getUsers: () => request<BasicUser[]>('/users'),
   searchUsers: (query: string, take = 20) => request<UserLookup[]>(`/comments/users/search?query=${encodeURIComponent(query)}&take=${take}`),
   getUserRoles: (id: string) => request<BasicRole[]>(`/users/${id}/roles`),
-  createUser: (payload: { user: { id: string; name: string }; roles: string[]; password: string }) =>
+  createUser: (payload: { user: { id: string; name: string; email: string }; roles: string[]; password: string }) =>
     request<BasicUser>('/users', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
-  updateUser: (payload: { user: { id: string; name: string }; roles: string[]; password: string }) =>
+  updateUser: (payload: { user: { id: string; name: string; email: string }; roles: string[]; password: string }) =>
     request<void>('/users', {
       method: 'PUT',
       body: JSON.stringify(payload),

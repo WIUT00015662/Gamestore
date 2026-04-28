@@ -284,8 +284,12 @@ export function HomePage() {
               <h3>{game.name}</h3>
               <p className="muted">Key</p>
               <p>{game.key}</p>
-              <p className="muted">Price</p>
-              <p>${game.price.toFixed(2)}</p>
+              <p className="muted">Best price</p>
+              {typeof game.bestOfferPrice === 'number' ? (
+                <p>${game.bestOfferPrice.toFixed(2)}</p>
+              ) : (
+                <p className="muted">No offers yet</p>
+              )}
               <p className="muted">Stock</p>
               <p>{game.unitInStock}</p>
             </article>

@@ -26,6 +26,11 @@ public class GameService(IUnitOfWork unitOfWork, ILogger<GameService> logger) : 
     {
         _logger.LogInformation("Creating game: {Name}", request.Game.Name);
 
+        if (request.VendorOffers.Count == 0)
+        {
+            throw new ArgumentException("At least one vendor offer is required.");
+        }
+
         var key = request.Game.Key;
         var existingGame = await _unitOfWork.Games.GetByKeyAsync(key);
         if (existingGame is not null)
@@ -45,9 +50,7 @@ public class GameService(IUnitOfWork unitOfWork, ILogger<GameService> logger) : 
             Name = request.Game.Name,
             Key = key,
             Description = request.Game.Description,
-            Price = request.Game.Price,
             UnitInStock = request.Game.UnitInStock,
-            Discount = request.Game.Discount,
             PublisherId = publisher.Id,
             Publisher = publisher,
         };
@@ -60,6 +63,21 @@ public class GameService(IUnitOfWork unitOfWork, ILogger<GameService> logger) : 
         foreach (var platform in platforms)
         {
             game.Platforms.Add(platform);
+        }
+
+        foreach (var offer in request.VendorOffers)
+        {
+            game.VendorOffers.Add(new GameVendorOffer
+            {
+                Id = Guid.NewGuid(),
+                GameId = game.Id,
+                GameName = game.Name,
+                Vendor = offer.Vendor,
+                PurchaseUrl = offer.PurchaseUrl,
+                Price = offer.Price,
+                TruePrice = offer.ReferencePrice,
+                CurrentPrice = offer.Price,
+            });
         }
 
         await _unitOfWork.Games.AddAsync(game);
@@ -87,11 +105,9 @@ public class GameService(IUnitOfWork unitOfWork, ILogger<GameService> logger) : 
     }
 
     /// <inheritdoc/>
-    public async Task<IEnumerable<GameResponse>> GetAllGamesAsync(bool includeDeleted = false)
+    public async Task<IEnumerable<GameResponse>> GetAllGamesAsync()
     {
-        var games = includeDeleted
-            ? await _unitOfWork.Games.GetAllWithDetailsIncludingDeletedAsync()
-            : await _unitOfWork.Games.GetAllAsync();
+        var games = await _unitOfWork.Games.GetAllWithDetailsAsync();
 
         return games.ToResponse();
     }
@@ -133,16 +149,18 @@ public class GameService(IUnitOfWork unitOfWork, ILogger<GameService> logger) : 
     }
 
     /// <inheritdoc/>
-    public async Task UpdateGameAsync(UpdateGameRequest request, bool includeDeleted = false)
+    public async Task UpdateGameAsync(UpdateGameRequest request)
     {
         _logger.LogInformation("Updating game with ID: {Id}", request.Game.Id);
 
-        var game = (includeDeleted
-            ? await _unitOfWork.Games.GetByIdWithDetailsIncludingDeletedAsync(request.Game.Id)
-            : await _unitOfWork.Games.GetByIdWithDetailsAsync(request.Game.Id)) ?? throw new EntityNotFoundException(nameof(Game), request.Game.Id);
-        var existingByKey = includeDeleted
-            ? await _unitOfWork.Games.GetByKeyIncludingDeletedAsync(request.Game.Key)
-            : await _unitOfWork.Games.GetByKeyAsync(request.Game.Key);
+        if (request.VendorOffers.Count == 0)
+        {
+            throw new ArgumentException("At least one vendor offer is required.");
+        }
+
+        var game = await _unitOfWork.Games.GetByIdWithDetailsAsync(request.Game.Id)
+            ?? throw new EntityNotFoundException(nameof(Game), request.Game.Id);
+        var existingByKey = await _unitOfWork.Games.GetByKeyAsync(request.Game.Key);
 
         if (existingByKey is not null && existingByKey.Id != request.Game.Id)
         {
@@ -158,9 +176,7 @@ public class GameService(IUnitOfWork unitOfWork, ILogger<GameService> logger) : 
         game.Name = request.Game.Name;
         game.Key = request.Game.Key;
         game.Description = request.Game.Description;
-        game.Price = request.Game.Price;
         game.UnitInStock = request.Game.UnitInStock;
-        game.Discount = request.Game.Discount;
         game.PublisherId = publisher.Id;
         game.Publisher = publisher;
 
@@ -176,6 +192,27 @@ public class GameService(IUnitOfWork unitOfWork, ILogger<GameService> logger) : 
             game.Platforms.Add(platform);
         }
 
+        var existingOffers = await _unitOfWork.GameVendorOffers.FindAsync(x => x.GameId == game.Id);
+        foreach (var offer in existingOffers)
+        {
+            _unitOfWork.GameVendorOffers.Delete(offer);
+        }
+
+        foreach (var offer in request.VendorOffers)
+        {
+            await _unitOfWork.GameVendorOffers.AddAsync(new GameVendorOffer
+            {
+                Id = Guid.NewGuid(),
+                GameId = game.Id,
+                GameName = game.Name,
+                Vendor = offer.Vendor,
+                PurchaseUrl = offer.PurchaseUrl,
+                Price = offer.Price,
+                TruePrice = offer.ReferencePrice,
+                CurrentPrice = offer.Price,
+            });
+        }
+
         _unitOfWork.Games.Update(game);
         await _unitOfWork.SaveChangesAsync();
     }
@@ -187,8 +224,7 @@ public class GameService(IUnitOfWork unitOfWork, ILogger<GameService> logger) : 
         var game = await _unitOfWork.Games.GetByKeyAsync(key)
             ?? throw new EntityNotFoundException(nameof(Game), key);
 
-        game.IsDeleted = true;
-        _unitOfWork.Games.Update(game);
+        _unitOfWork.Games.Delete(game);
         await _unitOfWork.SaveChangesAsync();
     }
 

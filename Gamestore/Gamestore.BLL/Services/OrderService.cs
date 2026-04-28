@@ -21,7 +21,7 @@ public class OrderService(
 
     public async Task AddGameToCartAsync(string gameKey, Guid userId)
     {
-        var game = await _unitOfWork.Games.GetByKeyAsync(gameKey)
+        var game = await _unitOfWork.Games.GetByKeyWithDetailsAsync(gameKey)
             ?? throw new EntityNotFoundException(nameof(Game), gameKey);
 
         var order = await GetOrCreateOpenOrderAsync(userId);
@@ -55,7 +55,7 @@ public class OrderService(
 
         EnsureOrderIsOpen(order);
 
-        var game = await _unitOfWork.Games.GetByKeyAsync(gameKey)
+        var game = await _unitOfWork.Games.GetByKeyWithDetailsAsync(gameKey)
             ?? throw new EntityNotFoundException(nameof(Game), gameKey);
 
         AddOrIncreaseOrderGame(order, game);
@@ -265,14 +265,21 @@ public class OrderService(
                 throw new ArgumentException("Game is out of stock.");
             }
 
+            if (game.VendorOffers.Count == 0)
+            {
+                throw new ArgumentException("Game has no vendor offers.");
+            }
+
+            var bestOfferPrice = game.VendorOffers.Min(offer => offer.CurrentPrice);
+
             order.OrderGames.Add(new OrderGame
             {
                 OrderId = order.Id,
                 ProductId = game.Id,
                 Product = game,
                 Quantity = 1,
-                Price = game.Price,
-                Discount = game.Discount,
+                Price = Convert.ToDouble(bestOfferPrice),
+                Discount = null,
             });
 
             return;

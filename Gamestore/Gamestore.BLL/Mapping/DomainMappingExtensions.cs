@@ -10,15 +10,20 @@ internal static class DomainMappingExtensions
 {
     public static GameResponse ToResponse(this Domain.Entities.Game game)
     {
+        decimal? bestOfferPrice = null;
+        if (game.VendorOffers.Count > 0)
+        {
+            bestOfferPrice = game.VendorOffers.Min(offer => offer.CurrentPrice);
+        }
+
         return new GameResponse
         {
             Id = game.Id,
             Name = game.Name,
             Key = game.Key,
             Description = game.Description,
-            Price = game.Price,
             UnitInStock = game.UnitInStock,
-            Discount = game.Discount,
+            BestOfferPrice = bestOfferPrice,
         };
     }
 

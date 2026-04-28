@@ -15,21 +15,11 @@ export function AdminPage() {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
 
-  const [newUserName, setNewUserName] = useState('');
-  const [newUserPassword, setNewUserPassword] = useState('');
-  const [newUserRoles, setNewUserRoles] = useState<string[]>([]);
+  const emptyUserForm = { id: '', name: '', email: '', password: '', roles: [] as string[] };
+  const emptyRoleForm = { id: '', name: '', permissions: [] as string[] };
 
-  const [editUserId, setEditUserId] = useState('');
-  const [editUserName, setEditUserName] = useState('');
-  const [editUserPassword, setEditUserPassword] = useState('');
-  const [editUserRoles, setEditUserRoles] = useState<string[]>([]);
-
-  const [newRoleName, setNewRoleName] = useState('');
-  const [newRolePermissions, setNewRolePermissions] = useState<string[]>([]);
-
-  const [editRoleId, setEditRoleId] = useState('');
-  const [editRoleName, setEditRoleName] = useState('');
-  const [editRolePermissions, setEditRolePermissions] = useState<string[]>([]);
+  const [userForm, setUserForm] = useState(emptyUserForm);
+  const [roleForm, setRoleForm] = useState(emptyRoleForm);
 
   const load = async () => {
     try {
@@ -51,22 +41,34 @@ export function AdminPage() {
     void load();
   }, []);
 
-  const createUser = async () => {
+  const saveUser = async () => {
     try {
-      await api.createUser({
-        user: { id: crypto.randomUUID(), name: newUserName },
-        roles: newUserRoles,
-        password: newUserPassword,
-      });
+      if (!userForm.email.trim()) {
+        setError('Email is required.');
+        return;
+      }
 
-      setNewUserName('');
-      setNewUserPassword('');
-      setNewUserRoles([]);
-      setMessage('User created.');
+      if (userForm.id) {
+        await api.updateUser({
+          user: { id: userForm.id, name: userForm.name, email: userForm.email },
+          roles: userForm.roles,
+          password: userForm.password || 'temporary-password',
+        });
+        setMessage('User updated.');
+      } else {
+        await api.createUser({
+          user: { id: crypto.randomUUID(), name: userForm.name, email: userForm.email },
+          roles: userForm.roles,
+          password: userForm.password,
+        });
+        setMessage('User created.');
+      }
+
+      setUserForm(emptyUserForm);
       setError('');
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Create user failed');
+      setError(e instanceof Error ? e.message : 'Save user failed');
     }
   };
 
@@ -76,30 +78,19 @@ export function AdminPage() {
       return;
     }
 
-    setEditUserId(user.id);
-    setEditUserName(user.name);
+    setUserForm((old) => ({
+      ...old,
+      id: user.id,
+      name: user.name,
+      email: user.email ?? '',
+      password: '',
+    }));
 
     try {
       const roleItems = await api.getUserRoles(id);
-      setEditUserRoles(roleItems.map((x) => x.id));
+      setUserForm((old) => ({ ...old, roles: roleItems.map((x) => x.id) }));
     } catch {
-      setEditUserRoles([]);
-    }
-  };
-
-  const updateUser = async () => {
-    try {
-      await api.updateUser({
-        user: { id: editUserId, name: editUserName },
-        roles: editUserRoles,
-        password: editUserPassword || 'temporary-password',
-      });
-
-      setMessage('User updated.');
-      setError('');
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Update user failed');
+      setUserForm((old) => ({ ...old, roles: [] }));
     }
   };
 
@@ -114,20 +105,27 @@ export function AdminPage() {
     }
   };
 
-  const createRole = async () => {
+  const saveRole = async () => {
     try {
-      await api.createRole({
-        role: { id: crypto.randomUUID(), name: newRoleName },
-        permissions: newRolePermissions,
-      });
+      if (roleForm.id) {
+        await api.updateRole({
+          role: { id: roleForm.id, name: roleForm.name },
+          permissions: roleForm.permissions,
+        });
+        setMessage('Role updated.');
+      } else {
+        await api.createRole({
+          role: { id: crypto.randomUUID(), name: roleForm.name },
+          permissions: roleForm.permissions,
+        });
+        setMessage('Role created.');
+      }
 
-      setNewRoleName('');
-      setNewRolePermissions([]);
-      setMessage('Role created.');
+      setRoleForm(emptyRoleForm);
       setError('');
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Create role failed');
+      setError(e instanceof Error ? e.message : 'Save role failed');
     }
   };
 
@@ -137,29 +135,13 @@ export function AdminPage() {
       return;
     }
 
-    setEditRoleId(role.id);
-    setEditRoleName(role.name);
+    setRoleForm((old) => ({ ...old, id: role.id, name: role.name }));
 
     try {
       const rolePermissions = await api.getRolePermissions(id);
-      setEditRolePermissions(rolePermissions);
+      setRoleForm((old) => ({ ...old, permissions: rolePermissions }));
     } catch {
-      setEditRolePermissions([]);
-    }
-  };
-
-  const updateRole = async () => {
-    try {
-      await api.updateRole({
-        role: { id: editRoleId, name: editRoleName },
-        permissions: editRolePermissions,
-      });
-
-      setMessage('Role updated.');
-      setError('');
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Update role failed');
+      setRoleForm((old) => ({ ...old, permissions: [] }));
     }
   };
 
@@ -185,7 +167,7 @@ export function AdminPage() {
           <ul className="list compact">
             {users.map((user: BasicUser) => (
               <li key={user.id}>
-                <span>{user.name}</span>
+                <span>{user.name}{user.email ? ` (${user.email})` : ''}</span>
                 <div className="row-actions">
                   <button type="button" className="btn-small" onClick={() => void selectUser(user.id)}>Edit</button>
                   <button type="button" className="btn-small danger" onClick={() => void deleteUser(user.id)}>Delete</button>
@@ -196,54 +178,36 @@ export function AdminPage() {
 
           <div className="form">
             <label>
-              New user name
-              <input value={newUserName} onChange={(e: ChangeEvent<HTMLInputElement>) => setNewUserName(e.target.value)} />
+              User name
+              <input value={userForm.name} onChange={(e: ChangeEvent<HTMLInputElement>) => setUserForm((old) => ({ ...old, name: e.target.value }))} />
+            </label>
+            <label>
+              Email
+              <input value={userForm.email} onChange={(e: ChangeEvent<HTMLInputElement>) => setUserForm((old) => ({ ...old, email: e.target.value }))} type="email" />
             </label>
             <label>
               Password
-              <input value={newUserPassword} onChange={(e: ChangeEvent<HTMLInputElement>) => setNewUserPassword(e.target.value)} type="password" />
+              <input value={userForm.password} onChange={(e: ChangeEvent<HTMLInputElement>) => setUserForm((old) => ({ ...old, password: e.target.value }))} type="password" />
             </label>
             <div className="check-grid">
               {roles.map((role: BasicRole) => (
                 <label key={role.id}>
                   <input
                     type="checkbox"
-                    checked={newUserRoles.includes(role.id)}
-                    onChange={() => setNewUserRoles((old: string[]) => toggle(old, role.id))}
+                    checked={userForm.roles.includes(role.id)}
+                    onChange={() => setUserForm((old) => ({ ...old, roles: toggle(old.roles, role.id) }))}
                   />
                   {role.name}
                 </label>
               ))}
             </div>
-            <button type="button" className="btn" onClick={() => void createUser()}>Create user</button>
-          </div>
-
-          {editUserId ? (
-            <div className="form">
-              <h4>Edit user</h4>
-              <label>
-                Name
-                <input value={editUserName} onChange={(e: ChangeEvent<HTMLInputElement>) => setEditUserName(e.target.value)} />
-              </label>
-              <label>
-                New password (optional)
-                <input value={editUserPassword} onChange={(e: ChangeEvent<HTMLInputElement>) => setEditUserPassword(e.target.value)} type="password" />
-              </label>
-              <div className="check-grid">
-                {roles.map((role: BasicRole) => (
-                  <label key={role.id}>
-                    <input
-                      type="checkbox"
-                      checked={editUserRoles.includes(role.id)}
-                      onChange={() => setEditUserRoles((old: string[]) => toggle(old, role.id))}
-                    />
-                    {role.name}
-                  </label>
-                ))}
-              </div>
-              <button type="button" className="btn" onClick={() => void updateUser()}>Update user</button>
+            <div className="row-actions">
+              <button type="button" className="btn" onClick={() => void saveUser()}>{userForm.id ? 'Update user' : 'Create user'}</button>
+              {userForm.id ? (
+                <button type="button" className="btn-small" onClick={() => setUserForm(emptyUserForm)}>Clear</button>
+              ) : null}
             </div>
-          ) : null}
+          </div>
         </article>
 
         <article className="card">
@@ -262,46 +226,28 @@ export function AdminPage() {
 
           <div className="form">
             <label>
-              New role name
-              <input value={newRoleName} onChange={(e) => setNewRoleName(e.target.value)} />
+              Role name
+              <input value={roleForm.name} onChange={(e) => setRoleForm((old) => ({ ...old, name: e.target.value }))} />
             </label>
             <div className="check-grid">
               {permissions.map((permission) => (
                 <label key={permission}>
                   <input
                     type="checkbox"
-                    checked={newRolePermissions.includes(permission)}
-                    onChange={() => setNewRolePermissions((old: string[]) => toggle(old, permission))}
+                    checked={roleForm.permissions.includes(permission)}
+                    onChange={() => setRoleForm((old) => ({ ...old, permissions: toggle(old.permissions, permission) }))}
                   />
                   {permission}
                 </label>
               ))}
             </div>
-            <button type="button" className="btn" onClick={() => void createRole()}>Create role</button>
-          </div>
-
-          {editRoleId ? (
-            <div className="form">
-              <h4>Edit role</h4>
-              <label>
-                Name
-                <input value={editRoleName} onChange={(e) => setEditRoleName(e.target.value)} />
-              </label>
-              <div className="check-grid">
-                {permissions.map((permission) => (
-                  <label key={permission}>
-                    <input
-                      type="checkbox"
-                      checked={editRolePermissions.includes(permission)}
-                      onChange={() => setEditRolePermissions((old: string[]) => toggle(old, permission))}
-                    />
-                    {permission}
-                  </label>
-                ))}
-              </div>
-              <button type="button" className="btn" onClick={() => void updateRole()}>Update role</button>
+            <div className="row-actions">
+              <button type="button" className="btn" onClick={() => void saveRole()}>{roleForm.id ? 'Update role' : 'Create role'}</button>
+              {roleForm.id ? (
+                <button type="button" className="btn-small" onClick={() => setRoleForm(emptyRoleForm)}>Clear</button>
+              ) : null}
             </div>
-          ) : null}
+          </div>
         </article>
       </div>
 

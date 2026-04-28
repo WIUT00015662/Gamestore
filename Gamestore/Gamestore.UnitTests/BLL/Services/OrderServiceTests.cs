@@ -47,7 +47,7 @@ public class OrderServiceTests
     [Fact]
     public async Task AddGameToCartAsyncThrowsEntityNotFoundExceptionWhenGameNotFound()
     {
-        _gameRepoMock.Setup(x => x.GetByKeyAsync("missing")).ReturnsAsync((Game?)null);
+        _gameRepoMock.Setup(x => x.GetByKeyWithDetailsAsync("missing")).ReturnsAsync((Game?)null);
 
         await Assert.ThrowsAsync<EntityNotFoundException>(() => _orderService.AddGameToCartAsync("missing", _testUserId));
     }
@@ -55,8 +55,19 @@ public class OrderServiceTests
     [Fact]
     public async Task AddGameToCartAsyncCreatesOpenOrderAndAddsGameWhenOrderDoesNotExist()
     {
-        var game = new Game { Id = Guid.NewGuid(), Name = "Test", Key = "test", Price = 100, UnitInStock = 5, Discount = 10 };
-        _gameRepoMock.Setup(x => x.GetByKeyAsync(game.Key)).ReturnsAsync(game);
+        var game = new Game { Id = Guid.NewGuid(), Name = "Test", Key = "test", UnitInStock = 5 };
+        game.VendorOffers.Add(new GameVendorOffer
+        {
+            Id = Guid.NewGuid(),
+            GameId = game.Id,
+            GameName = game.Name,
+            Vendor = "Store",
+            PurchaseUrl = "https://example.com",
+            Price = 10m,
+            TruePrice = 12m,
+            CurrentPrice = 10m,
+        });
+        _gameRepoMock.Setup(x => x.GetByKeyWithDetailsAsync(game.Key)).ReturnsAsync(game);
         _orderRepoMock.Setup(r => r.GetByStatusesAsync(It.IsAny<OrderStatus[]>())).ReturnsAsync([]);
 
         await _orderService.AddGameToCartAsync(game.Key, _testUserId);
@@ -68,7 +79,18 @@ public class OrderServiceTests
     [Fact]
     public async Task AddGameToCartAsyncIncrementsQuantityWhenGameAlreadyInCart()
     {
-        var game = new Game { Id = Guid.NewGuid(), Name = "Test", Key = "test", Price = 30, UnitInStock = 3, Discount = 0 };
+        var game = new Game { Id = Guid.NewGuid(), Name = "Test", Key = "test", UnitInStock = 3 };
+        game.VendorOffers.Add(new GameVendorOffer
+        {
+            Id = Guid.NewGuid(),
+            GameId = game.Id,
+            GameName = game.Name,
+            Vendor = "Store",
+            PurchaseUrl = "https://example.com",
+            Price = 10m,
+            TruePrice = 12m,
+            CurrentPrice = 10m,
+        });
         var order = new Order
         {
             Id = Guid.NewGuid(),
@@ -76,11 +98,11 @@ public class OrderServiceTests
             Status = OrderStatus.Open,
             OrderGames =
             [
-                new OrderGame { ProductId = game.Id, Price = game.Price, Quantity = 1, Discount = game.Discount, Product = game },
+                new OrderGame { ProductId = game.Id, Price = 10, Quantity = 1, Discount = null, Product = game },
             ],
         };
 
-        _gameRepoMock.Setup(x => x.GetByKeyAsync(game.Key)).ReturnsAsync(game);
+        _gameRepoMock.Setup(x => x.GetByKeyWithDetailsAsync(game.Key)).ReturnsAsync(game);
         _orderRepoMock.Setup(r => r.GetByStatusesAsync(It.IsAny<OrderStatus[]>())).ReturnsAsync([order]);
 
         await _orderService.AddGameToCartAsync(game.Key, _testUserId);

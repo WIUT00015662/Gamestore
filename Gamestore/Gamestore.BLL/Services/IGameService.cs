@@ -11,7 +11,7 @@ public interface IGameService
 
     Task<GameResponse> GetGameByIdAsync(Guid id);
 
-    Task<IEnumerable<GameResponse>> GetAllGamesAsync(bool includeDeleted = false);
+    Task<IEnumerable<GameResponse>> GetAllGamesAsync();
 
     Task<int> GetGamesCountAsync();
 
@@ -33,7 +33,7 @@ public interface IGameService
 
     Task IncrementGameViewCountAsync(Guid gameId);
 
-    Task UpdateGameAsync(UpdateGameRequest request, bool includeDeleted = false);
+    Task UpdateGameAsync(UpdateGameRequest request);
 
     Task DeleteGameAsync(string key);
 

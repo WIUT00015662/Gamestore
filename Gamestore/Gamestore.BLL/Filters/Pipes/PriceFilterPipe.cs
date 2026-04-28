@@ -17,12 +17,16 @@ public class PriceFilterPipe(double? minPrice, double? maxPrice) : IFilterPipe
 
             if (minPrice.HasValue)
             {
-                gameQuery = gameQuery.Where(g => g.Price >= minPrice.Value);
+                gameQuery = gameQuery
+                    .Where(g => g.VendorOffers.Any())
+                    .Where(g => g.VendorOffers.Min(o => o.CurrentPrice) >= (decimal)minPrice.Value);
             }
 
             if (maxPrice.HasValue)
             {
-                gameQuery = gameQuery.Where(g => g.Price <= maxPrice.Value);
+                gameQuery = gameQuery
+                    .Where(g => g.VendorOffers.Any())
+                    .Where(g => g.VendorOffers.Min(o => o.CurrentPrice) <= (decimal)maxPrice.Value);
             }
 
             return (IQueryable<T>)gameQuery;

@@ -18,6 +18,7 @@ public class GameServiceTests
     private readonly Mock<IGenreRepository> _genreRepoMock;
     private readonly Mock<IPlatformRepository> _platformRepoMock;
     private readonly Mock<IPublisherRepository> _publisherRepoMock;
+    private readonly Mock<IRepository<GameVendorOffer>> _gameVendorOfferRepoMock;
     private readonly Mock<ILogger<GameService>> _loggerMock;
     private readonly GameService _gameService;
 
@@ -27,6 +28,7 @@ public class GameServiceTests
         _genreRepoMock = new Mock<IGenreRepository>();
         _platformRepoMock = new Mock<IPlatformRepository>();
         _publisherRepoMock = new Mock<IPublisherRepository>();
+        _gameVendorOfferRepoMock = new Mock<IRepository<GameVendorOffer>>();
         _loggerMock = new Mock<ILogger<GameService>>();
 
         _unitOfWorkMock = new Mock<IUnitOfWork>();
@@ -34,6 +36,7 @@ public class GameServiceTests
         _unitOfWorkMock.Setup(u => u.Genres).Returns(_genreRepoMock.Object);
         _unitOfWorkMock.Setup(u => u.Platforms).Returns(_platformRepoMock.Object);
         _unitOfWorkMock.Setup(u => u.Publishers).Returns(_publisherRepoMock.Object);
+        _unitOfWorkMock.Setup(u => u.GameVendorOffers).Returns(_gameVendorOfferRepoMock.Object);
 
         _gameService = new GameService(_unitOfWorkMock.Object, _loggerMock.Object);
     }
@@ -48,10 +51,12 @@ public class GameServiceTests
                 Name = "Test",
                 Key = "test-key",
                 Description = "desc",
-                Price = 1,
                 UnitInStock = 1,
-                Discount = 0,
             },
+            VendorOffers =
+            [
+                new GameVendorOfferRequest { Vendor = "Store", PurchaseUrl = "https://example.com", Price = 1, ReferencePrice = 1 },
+            ],
             Publisher = Guid.NewGuid(),
         };
         _gameRepoMock.Setup(x => x.GetByKeyAsync("test-key")).ReturnsAsync(new Game { Name = "Test", Key = "test-key" });
@@ -65,7 +70,11 @@ public class GameServiceTests
         var publisherId = Guid.NewGuid();
         var req = new CreateGameRequest
         {
-            Game = new CreateGameBody { Name = "Test Game", Key = "test-game", Description = "Desc", Price = 1, UnitInStock = 2, Discount = 0 },
+            Game = new CreateGameBody { Name = "Test Game", Key = "test-game", Description = "Desc", UnitInStock = 2 },
+            VendorOffers =
+            [
+                new GameVendorOfferRequest { Vendor = "Store", PurchaseUrl = "https://example.com", Price = 1, ReferencePrice = 1 },
+            ],
             Genres = [Guid.NewGuid()],
             Platforms = [Guid.NewGuid()],
             Publisher = publisherId,
@@ -103,7 +112,7 @@ public class GameServiceTests
     [Fact]
     public async Task GetAllGamesAsyncReturnsGames()
     {
-        _gameRepoMock.Setup(x => x.GetAllAsync()).ReturnsAsync([new Game { Name = "G1", Key = "g1" }, new Game { Name = "G2", Key = "g2" }]);
+        _gameRepoMock.Setup(x => x.GetAllWithDetailsAsync()).ReturnsAsync([new Game { Name = "G1", Key = "g1" }, new Game { Name = "G2", Key = "g2" }]);
         var result = await _gameService.GetAllGamesAsync();
         Assert.Equal(2, result.Count());
     }
@@ -149,7 +158,11 @@ public class GameServiceTests
         var publisherId = Guid.NewGuid();
         var req = new UpdateGameRequest
         {
-            Game = new UpdateGameBody { Id = gameId, Name = "Updated", Key = "updated-key", Description = "new desc", Price = 20, UnitInStock = 1, Discount = 2 },
+            Game = new UpdateGameBody { Id = gameId, Name = "Updated", Key = "updated-key", Description = "new desc", UnitInStock = 1 },
+            VendorOffers =
+            [
+                new GameVendorOfferRequest { Vendor = "Store", PurchaseUrl = "https://example.com", Price = 10, ReferencePrice = 12 },
+            ],
             Genres = [Guid.NewGuid()],
             Platforms = [],
             Publisher = publisherId,
@@ -160,6 +173,8 @@ public class GameServiceTests
         _gameRepoMock.Setup(x => x.GetByKeyAsync(req.Game.Key)).ReturnsAsync((Game?)null);
         _genreRepoMock.Setup(x => x.GetByIdAsync(req.Genres[0])).ReturnsAsync(new Genre { Id = req.Genres[0], Name = "RPG" });
         _publisherRepoMock.Setup(x => x.GetByIdAsync(publisherId)).ReturnsAsync(new Publisher { Id = publisherId, CompanyName = "Pub" });
+        _gameVendorOfferRepoMock.Setup(x => x.FindAsync(It.IsAny<System.Linq.Expressions.Expression<Func<GameVendorOffer, bool>>>()))
+            .ReturnsAsync([]);
 
         await _gameService.UpdateGameAsync(req);
 
@@ -173,13 +188,12 @@ public class GameServiceTests
     [Fact]
     public async Task DeleteGameAsyncDeletesWhenExists()
     {
-        var existingGame = new Game { Name = "ToDelete", Key = "to-delete", IsDeleted = false };
+        var existingGame = new Game { Name = "ToDelete", Key = "to-delete" };
         _gameRepoMock.Setup(x => x.GetByKeyAsync("to-delete")).ReturnsAsync(existingGame);
 
         await _gameService.DeleteGameAsync("to-delete");
 
-        Assert.True(existingGame.IsDeleted);
-        _gameRepoMock.Verify(x => x.Update(existingGame), Times.Once);
+        _gameRepoMock.Verify(x => x.Delete(existingGame), Times.Once);
         _unitOfWorkMock.Verify(x => x.SaveChangesAsync(), Times.Once);
     }
 
@@ -215,10 +229,13 @@ public class GameServiceTests
     {
         var req = new UpdateGameRequest
         {
-            Game = new UpdateGameBody { Id = Guid.NewGuid(), Name = "Update", Key = "up", Description = "desc", Price = 1, UnitInStock = 1, Discount = 0 },
+            Game = new UpdateGameBody { Id = Guid.NewGuid(), Name = "Update", Key = "up", Description = "desc", UnitInStock = 1 },
+            VendorOffers =
+            [
+                new GameVendorOfferRequest { Vendor = "Store", PurchaseUrl = "https://example.com", Price = 1, ReferencePrice = 1 },
+            ],
             Publisher = Guid.NewGuid(),
         };
-        _gameRepoMock.Setup(x => x.GetByIdWithDetailsAsync(It.IsAny<Guid>())).ReturnsAsync((Game?)null);
         await Assert.ThrowsAsync<EntityNotFoundException>(() => _gameService.UpdateGameAsync(req));
     }
 
@@ -287,8 +304,8 @@ public class GameServiceTests
         var publisherId = Guid.NewGuid();
         context.Publishers.Add(new Publisher { Id = publisherId, CompanyName = "Pub" });
         context.Games.AddRange(
-            new Game { Id = Guid.NewGuid(), Name = "Game 1", Key = "game-1", Price = 100, ViewCount = 5, PublishDate = DateTime.UtcNow.AddDays(-1), PublisherId = publisherId, Comments = [] },
-            new Game { Id = Guid.NewGuid(), Name = "Game 2", Key = "game-2", Price = 50, ViewCount = 10, PublishDate = DateTime.UtcNow.AddMonths(-2), PublisherId = publisherId, Comments = [] });
+            new Game { Id = Guid.NewGuid(), Name = "Game 1", Key = "game-1", ViewCount = 5, PublishDate = DateTime.UtcNow.AddDays(-1), PublisherId = publisherId, Comments = [] },
+            new Game { Id = Guid.NewGuid(), Name = "Game 2", Key = "game-2", ViewCount = 10, PublishDate = DateTime.UtcNow.AddMonths(-2), PublisherId = publisherId, Comments = [] });
         await context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         using var unitOfWork = new UnitOfWork(context);

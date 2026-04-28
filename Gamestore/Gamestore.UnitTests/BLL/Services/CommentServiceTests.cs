@@ -103,7 +103,7 @@ public class CommentServiceTests
         var game = new Game { Id = Guid.NewGuid(), Name = "Game", Key = "game" };
         var rootId = Guid.NewGuid();
 
-        _gameRepoMock.Setup(x => x.GetByKeyIncludingDeletedAsync("game")).ReturnsAsync(game);
+        _gameRepoMock.Setup(x => x.GetByKeyAsync("game")).ReturnsAsync(game);
         _commentRepoMock
             .Setup(x => x.GetByGameIdAsync(game.Id))
             .ReturnsAsync([
@@ -134,7 +134,7 @@ public class CommentServiceTests
             QuotedCommentId = commentId,
         };
 
-        _gameRepoMock.Setup(x => x.GetByKeyIncludingDeletedAsync("game")).ReturnsAsync(game);
+        _gameRepoMock.Setup(x => x.GetByKeyAsync("game")).ReturnsAsync(game);
         _commentRepoMock.Setup(x => x.GetByIdWithDetailsAsync(commentId)).ReturnsAsync(comment);
         _commentRepoMock.Setup(x => x.GetQuotedByCommentIdAsync(commentId)).ReturnsAsync([quotingComment]);
 

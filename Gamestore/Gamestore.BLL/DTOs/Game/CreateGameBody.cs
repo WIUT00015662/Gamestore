@@ -14,12 +14,6 @@ public class CreateGameBody
     [StringLength(2000, MinimumLength = 1)]
     public required string Description { get; set; }
 
-    [Range(0, double.MaxValue)]
-    public required double Price { get; set; }
-
     [Range(0, int.MaxValue)]
     public required int UnitInStock { get; set; }
-
-    [Range(0, int.MaxValue)]
-    public required int Discount { get; set; }
 }

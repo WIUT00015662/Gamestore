@@ -69,10 +69,12 @@ public class GamesControllerTests
                 Name = "Test",
                 Key = "test",
                 Description = "desc",
-                Price = 1,
                 UnitInStock = 1,
-                Discount = 0,
             },
+            VendorOffers =
+            [
+                new GameVendorOfferRequest { Vendor = "Store", PurchaseUrl = "https://example.com", Price = 1, ReferencePrice = 1 },
+            ],
             Publisher = Guid.NewGuid(),
         };
         var response = new GameResponse { Id = Guid.NewGuid(), Name = "Test", Key = "test" };
@@ -176,18 +178,20 @@ public class GamesControllerTests
                 Name = "Update",
                 Key = "up",
                 Description = "desc",
-                Price = 1,
                 UnitInStock = 1,
-                Discount = 0,
             },
+            VendorOffers =
+            [
+                new GameVendorOfferRequest { Vendor = "Store", PurchaseUrl = "https://example.com", Price = 1, ReferencePrice = 1 },
+            ],
             Publisher = Guid.NewGuid(),
         };
-        _gameServiceMock.Setup(s => s.UpdateGameAsync(request, It.IsAny<bool>())).Returns(Task.CompletedTask);
+        _gameServiceMock.Setup(s => s.UpdateGameAsync(request)).Returns(Task.CompletedTask);
 
         var result = await _controller.UpdateGame(request);
 
         Assert.IsType<NoContentResult>(result);
-        _gameServiceMock.Verify(s => s.UpdateGameAsync(request, false), Times.Once);
+        _gameServiceMock.Verify(s => s.UpdateGameAsync(request), Times.Once);
     }
 
     [Fact]
@@ -337,32 +341,13 @@ public class GamesControllerTests
             new() { Id = Guid.NewGuid(), Name = "Test 1", Key = "test-1" },
         };
 
-        _gameServiceMock.Setup(s => s.GetAllGamesAsync(false)).ReturnsAsync(games);
-        _currentUserServiceMock.Setup(s => s.HasPermission(Permissions.ViewDeletedGames)).Returns(false);
+        _gameServiceMock.Setup(s => s.GetAllGamesAsync()).ReturnsAsync(games);
 
         var result = await _controller.GetAllGamesWithoutFilters();
 
         var okResult = Assert.IsType<OkObjectResult>(result);
         Assert.Equal(games, okResult.Value);
-        _gameServiceMock.Verify(s => s.GetAllGamesAsync(false), Times.Once);
-    }
-
-    [Fact]
-    public async Task GetAllGamesWithoutFiltersReturnsDeletedGamesWhenUserHasViewDeletedClaim()
-    {
-        var games = new List<GameResponse>
-        {
-            new() { Id = Guid.NewGuid(), Name = "Deleted Test", Key = "deleted-test" },
-        };
-
-        _gameServiceMock.Setup(s => s.GetAllGamesAsync(true)).ReturnsAsync(games);
-        _currentUserServiceMock.Setup(s => s.HasPermission(Permissions.ViewDeletedGames)).Returns(true);
-
-        var result = await _controller.GetAllGamesWithoutFilters();
-
-        var okResult = Assert.IsType<OkObjectResult>(result);
-        Assert.Equal(games, okResult.Value);
-        _gameServiceMock.Verify(s => s.GetAllGamesAsync(true), Times.Once);
+        _gameServiceMock.Verify(s => s.GetAllGamesAsync(), Times.Once);
     }
 
     [Fact]
@@ -381,41 +366,6 @@ public class GamesControllerTests
         _commentServiceMock.Verify(x => x.AddCommentAsync("test", request, _testUserId, "AuthorizedUser"), Times.Once);
     }
 
-    [Fact]
-    public async Task UpdateGameUsesIncludeDeletedWhenUserHasEditDeletedClaim()
-    {
-        var request = new UpdateGameRequest
-        {
-            Game = new UpdateGameBody
-            {
-                Id = Guid.NewGuid(),
-                Name = "Update",
-                Key = "up",
-                Description = "desc",
-                Price = 1,
-                UnitInStock = 1,
-                Discount = 0,
-            },
-            Publisher = Guid.NewGuid(),
-        };
-
-        var claims = new List<Claim> { new("permission", Permissions.EditDeletedGame) };
-        var identity = new ClaimsIdentity(claims, "TestAuth");
-        _controller.ControllerContext = new ControllerContext
-        {
-            HttpContext = new DefaultHttpContext
-            {
-                User = new ClaimsPrincipal(identity),
-            },
-        };
-
-        _gameServiceMock.Setup(s => s.UpdateGameAsync(request, true)).Returns(Task.CompletedTask);
-
-        var result = await _controller.UpdateGame(request);
-
-        Assert.IsType<NoContentResult>(result);
-        _gameServiceMock.Verify(s => s.UpdateGameAsync(request, true), Times.Once);
-    }
 
     [Fact]
     public async Task DeleteCommentUsesCurrentUserServiceIdentityAndPermissions()

@@ -16,18 +16,13 @@ internal sealed class GameConfiguration : IEntityTypeConfiguration<Game>
         builder.HasIndex(g => g.Key).IsUnique();
         builder.Property(g => g.Name).IsRequired();
         builder.Property(g => g.Key).IsRequired();
-        builder.Property(g => g.Price).IsRequired();
         builder.Property(g => g.UnitInStock).IsRequired();
-        builder.Property(g => g.Discount).IsRequired();
         builder.Property(g => g.PublishDate)
             .IsRequired()
             .HasDefaultValueSql("GETUTCDATE()");
         builder.Property(g => g.ViewCount)
             .IsRequired()
             .HasDefaultValue(0);
-        builder.Property(g => g.IsDeleted)
-            .IsRequired()
-            .HasDefaultValue(false);
 
         builder.HasOne(g => g.Publisher)
             .WithMany(p => p.Games)

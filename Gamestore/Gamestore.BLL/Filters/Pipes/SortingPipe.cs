@@ -19,8 +19,8 @@ public class SortingPipe(string? sortBy) : IFilterPipe
             {
                 "most popular" => gameQuery.OrderByDescending(g => g.ViewCount),
                 "most commented" => gameQuery.OrderByDescending(g => g.Comments.Count),
-                "price asc" => gameQuery.OrderBy(g => g.Price),
-                "price desc" => gameQuery.OrderByDescending(g => g.Price),
+                "price asc" => gameQuery.OrderBy(g => g.VendorOffers.Min(o => o.CurrentPrice)),
+                "price desc" => gameQuery.OrderByDescending(g => g.VendorOffers.Min(o => o.CurrentPrice)),
                 "new" => gameQuery.OrderByDescending(g => g.PublishDate),
                 _ => gameQuery,
             };

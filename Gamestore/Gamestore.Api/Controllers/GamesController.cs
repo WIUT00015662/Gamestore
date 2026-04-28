@@ -93,8 +93,7 @@ public class GamesController(
     [HttpGet("all")]
     public async Task<IActionResult> GetAllGamesWithoutFilters()
     {
-        var includeDeleted = _currentUserService.HasPermission(Permissions.ViewDeletedGames);
-        var games = await _gameService.GetAllGamesAsync(includeDeleted);
+        var games = await _gameService.GetAllGamesAsync();
         return Ok(games);
     }
 
@@ -136,8 +135,7 @@ public class GamesController(
     [HttpPut]
     public async Task<IActionResult> UpdateGame([FromBody] UpdateGameRequest request)
     {
-        var includeDeleted = User.HasClaim("permission", Permissions.EditDeletedGame);
-        await _gameService.UpdateGameAsync(request, includeDeleted);
+        await _gameService.UpdateGameAsync(request);
         return NoContent();
     }
 

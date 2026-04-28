@@ -28,6 +28,13 @@ services:
       PaymentGatewaySettings__IBoxSuccessRate: ${IBOX_SUCCESS_RATE:-0.85}
       PaymentGatewaySettings__VisaSuccessRate: ${VISA_SUCCESS_RATE:-0.9}
       DiscountPolling__IntervalMinutes: ${DISCOUNT_POLLING_INTERVAL_MINUTES:-30}
+      SmtpSettings__Host: ${SmtpSettings__Host}
+      SmtpSettings__Port: ${SmtpSettings__Port}
+      SmtpSettings__UseSSL: ${SmtpSettings__UseSSL}
+      SmtpSettings__Username: ${SmtpSettings__Username}
+      SmtpSettings__Password: ${SmtpSettings__Password}
+      SmtpSettings__FromEmail: ${SmtpSettings__FromEmail}
+      SmtpSettings__FromName: ${SmtpSettings__FromName}
     depends_on:
       - db
 

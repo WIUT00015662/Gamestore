@@ -171,6 +171,9 @@ export function GameDetailsPage() {
   const canComment = hasPermission('CommentGame');
   const canModerate = hasPermission('ManageComments');
   const currentUser = useMemo(() => getUserName(), []);
+  const bestPrice = offers.length > 0
+    ? Math.min(...offers.map((offer) => offer.price))
+    : game?.bestOfferPrice;
 
   if (!game) {
     return <section className="section">Loading...</section>;
@@ -181,9 +184,11 @@ export function GameDetailsPage() {
       <h2>{game.name}</h2>
       <p className="muted">{game.key}</p>
       <p>{game.description}</p>
-      <p>
-        <strong>${game.price.toFixed(2)}</strong>
-      </p>
+      {typeof bestPrice === 'number' ? (
+        <p>
+          <strong>${bestPrice.toFixed(2)}</strong>
+        </p>
+      ) : null}
 
       {canBuy ? (
         <button className="btn" type="button" onClick={() => void buy()}>

@@ -52,44 +52,48 @@ export function LoginPage({ onLogin }: LoginPageProps) {
   };
 
   return (
-    <section className="section form-wrap">
-      <h2>Sign in</h2>
-      <form onSubmit={handleSubmit} className="form">
-        <label>
-          Login
-          <input value={login} onChange={(e) => setLogin(e.target.value)} />
-        </label>
-        <label>
-          Password
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
-        </label>
-        <button type="submit" className="btn">
-          Login
-        </button>
-      </form>
-      {error ? <p className="error">{error}</p> : null}
+    <section className="section">
+      <div className="auth-grid">
+        <div className="auth-card">
+          <h2>Sign in</h2>
+          <form onSubmit={handleSubmit} className="form">
+            <label>
+              Login
+              <input value={login} onChange={(e) => setLogin(e.target.value)} />
+            </label>
+            <label>
+              Password
+              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+            </label>
+            <button type="submit" className="btn">
+              Login
+            </button>
+          </form>
+          {error ? <p className="error">{error}</p> : null}
+        </div>
 
-      <div className="spacer" />
-
-      <h2>Create account</h2>
-      <form onSubmit={handleRegister} className="form">
-        <label>
-          User name
-          <input value={registerName} onChange={(e) => setRegisterName(e.target.value)} />
-        </label>
-        <label>
-          Email
-          <input type="email" value={registerEmail} onChange={(e) => setRegisterEmail(e.target.value)} />
-        </label>
-        <label>
-          Password
-          <input type="password" value={registerPassword} onChange={(e) => setRegisterPassword(e.target.value)} />
-        </label>
-        <button type="submit" className="btn">
-          Register
-        </button>
-      </form>
-      {registerError ? <p className="error">{registerError}</p> : null}
+        <div className="auth-card">
+          <h2>Create account</h2>
+          <form onSubmit={handleRegister} className="form">
+            <label>
+              User name
+              <input value={registerName} onChange={(e) => setRegisterName(e.target.value)} />
+            </label>
+            <label>
+              Email
+              <input type="email" value={registerEmail} onChange={(e) => setRegisterEmail(e.target.value)} />
+            </label>
+            <label>
+              Password
+              <input type="password" value={registerPassword} onChange={(e) => setRegisterPassword(e.target.value)} />
+            </label>
+            <button type="submit" className="btn">
+              Register
+            </button>
+          </form>
+          {registerError ? <p className="error">{registerError}</p> : null}
+        </div>
+      </div>
     </section>
   );
 }

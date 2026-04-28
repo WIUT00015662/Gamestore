@@ -27,9 +27,16 @@ export type Game = {
   name: string;
   key: string;
   description?: string;
-  price: number;
   unitInStock: number;
-  discount: number;
+  bestOfferPrice?: number;
+};
+
+export type GameVendorOfferInput = {
+  clientId?: string;
+  vendor: string;
+  purchaseUrl: string;
+  price: number;
+  referencePrice: number;
 };
 
 export type GetGamesResponse = {
@@ -93,6 +100,7 @@ export type PaymentMethodsResponse = {
 export type BasicUser = {
   id: string;
   name: string;
+  email?: string;
 };
 
 export type BasicRole = {

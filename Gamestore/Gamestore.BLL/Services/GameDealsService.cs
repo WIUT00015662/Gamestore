@@ -75,7 +75,7 @@ public class GameDealsService(
 
     public async Task<IReadOnlyCollection<GameVendorOfferResponse>> GetOffersByGameKeyAsync(string key)
     {
-        var game = await _unitOfWork.Games.GetByKeyIncludingDeletedAsync(key)
+        var game = await _unitOfWork.Games.GetByKeyAsync(key)
             ?? throw new EntityNotFoundException(nameof(Game), key);
 
         var offers = await _unitOfWork.GameVendorOffers.FindAsync(x => x.GameId == game.Id);
@@ -129,38 +129,6 @@ public class GameDealsService(
         {
             return;
         }
-
-        var games = await _unitOfWork.Games.GetAllAsync();
-        foreach (var game in games)
-        {
-            var gameHubPrice = Convert.ToDecimal(game.Price);
-            await _unitOfWork.GameVendorOffers.AddAsync(new GameVendorOffer
-            {
-                Id = Guid.NewGuid(),
-                GameId = game.Id,
-                GameName = game.Name,
-                Vendor = "GameHub",
-                PurchaseUrl = $"https://gamehub.local/{game.Key}",
-                Price = gameHubPrice,
-                TruePrice = gameHubPrice,
-                CurrentPrice = gameHubPrice,
-            });
-
-            var metaPlayPrice = Math.Max(0.99m, gameHubPrice + 3m);
-            await _unitOfWork.GameVendorOffers.AddAsync(new GameVendorOffer
-            {
-                Id = Guid.NewGuid(),
-                GameId = game.Id,
-                GameName = game.Name,
-                Vendor = "MetaPlay",
-                PurchaseUrl = $"https://metaplay.local/{game.Key}",
-                Price = metaPlayPrice,
-                TruePrice = metaPlayPrice,
-                CurrentPrice = metaPlayPrice,
-            });
-        }
-
-        await _unitOfWork.SaveChangesAsync();
     }
 
     private static DiscountedGameResponse ToResponse(GameDiscountSnapshot snapshot)

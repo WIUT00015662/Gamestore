@@ -63,6 +63,7 @@ public class AuthManagementService(IUnitOfWork unitOfWork, JwtSettings jwtSettin
         {
             Id = Guid.NewGuid(),
             Name = request.UserName.Trim(),
+            Email = request.Email.Trim(),
             PasswordHash = HashPassword(request.Password),
             UserRoles =
             [
@@ -100,13 +101,8 @@ public class AuthManagementService(IUnitOfWork unitOfWork, JwtSettings jwtSettin
             || request.TargetPage.Equals("games", StringComparison.OrdinalIgnoreCase))
             && request.TargetId is { } gameId)
         {
-            var game = await _unitOfWork.Games.GetByIdWithDetailsIncludingDeletedAsync(gameId);
+            var game = await _unitOfWork.Games.GetByIdWithDetailsAsync(gameId);
             if (game is null)
-            {
-                return false;
-            }
-
-            if (game.IsDeleted && !principal.Claims.Any(c => c.Type == "permission" && c.Value == Permissions.ViewDeletedGames))
             {
                 return false;
             }
@@ -118,7 +114,7 @@ public class AuthManagementService(IUnitOfWork unitOfWork, JwtSettings jwtSettin
     public async Task<IEnumerable<BasicUserResponse>> GetUsersAsync()
     {
         var users = await _unitOfWork.Users.GetAllAsync();
-        return users.Select(u => new BasicUserResponse { Id = u.Id, Name = u.Name });
+        return users.Select(u => new BasicUserResponse { Id = u.Id, Name = u.Name, Email = u.Email });
     }
 
     public async Task<BasicUserResponse> GetUserByIdAsync(Guid id)
@@ -126,7 +122,7 @@ public class AuthManagementService(IUnitOfWork unitOfWork, JwtSettings jwtSettin
         var user = await _unitOfWork.Users.GetByIdAsync(id)
             ?? throw new EntityNotFoundException(nameof(User), id);
 
-        return new BasicUserResponse { Id = user.Id, Name = user.Name };
+        return new BasicUserResponse { Id = user.Id, Name = user.Name, Email = user.Email };
     }
 
     public async Task DeleteUserAsync(Guid id)
@@ -140,6 +136,11 @@ public class AuthManagementService(IUnitOfWork unitOfWork, JwtSettings jwtSettin
 
     public async Task<BasicUserResponse> CreateUserAsync(CreateOrUpdateUserRequest request)
     {
+        if (string.IsNullOrWhiteSpace(request.User.Email))
+        {
+            throw new ArgumentException("Email is required.");
+        }
+
         if (await _unitOfWork.Users.GetByNameAsync(request.User.Name) is not null)
         {
             throw new EntityAlreadyExistsException(nameof(User), nameof(User.Name), request.User.Name);
@@ -151,6 +152,7 @@ public class AuthManagementService(IUnitOfWork unitOfWork, JwtSettings jwtSettin
         {
             Id = Guid.NewGuid(),
             Name = request.User.Name,
+            Email = request.User.Email.Trim(),
             PasswordHash = HashPassword(request.Password),
             UserRoles =
             [
@@ -161,11 +163,16 @@ public class AuthManagementService(IUnitOfWork unitOfWork, JwtSettings jwtSettin
         await _unitOfWork.Users.AddAsync(user);
         await _unitOfWork.SaveChangesAsync();
 
-        return new BasicUserResponse { Id = user.Id, Name = user.Name };
+        return new BasicUserResponse { Id = user.Id, Name = user.Name, Email = user.Email };
     }
 
     public async Task UpdateUserAsync(CreateOrUpdateUserRequest request)
     {
+        if (string.IsNullOrWhiteSpace(request.User.Email))
+        {
+            throw new ArgumentException("Email is required.");
+        }
+
         var user = await _unitOfWork.Users.GetByIdWithRolesAsync(request.User.Id)
             ?? throw new EntityNotFoundException(nameof(User), request.User.Id);
 
@@ -178,6 +185,7 @@ public class AuthManagementService(IUnitOfWork unitOfWork, JwtSettings jwtSettin
         var roles = await ResolveRolesAsync(request.Roles);
 
         user.Name = request.User.Name;
+        user.Email = request.User.Email.Trim();
         user.PasswordHash = HashPassword(request.Password);
         user.UserRoles.Clear();
         foreach (var role in roles)

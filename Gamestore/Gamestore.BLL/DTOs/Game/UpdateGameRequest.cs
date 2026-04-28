@@ -4,6 +4,8 @@ public class UpdateGameRequest
 {
     public required UpdateGameBody Game { get; set; }
 
+    public List<GameVendorOfferRequest> VendorOffers { get; set; } = [];
+
     public List<Guid> Genres { get; set; } = [];
 
     public List<Guid> Platforms { get; set; } = [];
